@@ -1,19 +1,9 @@
 #!/usr/bin/env bash
-#==============================================================================
+# =============================================================
+#  pizero-headless.sh  —  Toggle headless mode on the Pi Zero 2 WH
+#  Installed to /usr/local/lib/pizero/pizero-headless.sh
 #
-#  pizero2wh-headless.sh
-#  ─────────────────────
-#  Headless Mode Toggle for Raspberry Pi Zero 2 WH
-#
-#  Target:  Raspberry Pi OS 64-bit (Debian 13 / Trixie)
-#  Board:   Raspberry Pi Zero 2 WH  (RP3A0 SiP, BCM2710A1, 512 MB LPDDR2)
-#
-#  Version: 1.0.0
-#  License: MIT
-#
-#  USAGE:
-#    chmod +x pizero2wh-headless.sh
-#    sudo ./pizero2wh-headless.sh [COMMAND] [OPTIONS]
+#  Usage:  sudo bash pizero-headless.sh [COMMAND] [OPTIONS]
 #
 #  COMMANDS:
 #    on          Apply headless mode (HDMI off, CMA=32 MB, watchdog, etc.)
@@ -72,7 +62,7 @@
 #      If no backup exists it reverts to known safe desktop defaults.
 #    • DO NOT use 'on' if a monitor is connected and you need it to work.
 #
-#==============================================================================
+# =============================================================
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -223,7 +213,7 @@ add_config_line() {
         return
     fi
 
-    if ! grep -qF "^${line}" "$CONFIG_TXT"; then
+    if ! grep -qxF "$line" "$CONFIG_TXT"; then
         echo "$line" >> "$CONFIG_TXT"
         log_ok "Added:    ${line}"
         echo "added_line:${line}" >> "$STATE_FILE"
@@ -367,7 +357,7 @@ cmd_status() {
         printf "  ├─ %-32s %s\n" "${key}:" "${val}"
     done
     for line in "${headless_lines[@]}"; do
-        if grep -qF "^${line}" "$CONFIG_TXT" 2>/dev/null; then
+        if grep -qxF "$line" "$CONFIG_TXT" 2>/dev/null; then
             printf "  ├─ %-32s %s\n" "${line}:" "present ✓"
         else
             printf "  ├─ %-32s %s\n" "${line}:" "(not present)"
@@ -439,7 +429,7 @@ cmd_on() {
         if ! grep -q "^\[pi02\]" "$CONFIG_TXT"; then
             echo "" >> "$CONFIG_TXT"
             echo "[pi02]" >> "$CONFIG_TXT"
-            echo "# Pi Zero 2 WH headless settings — managed by pizero2wh-headless.sh" >> "$CONFIG_TXT"
+            echo "# Pi Zero 2 WH headless settings — managed by pizero-headless.sh" >> "$CONFIG_TXT"
             echo "added_line:[pi02]" >> "$STATE_FILE"
             log_ok "Added [pi02] section to config.txt"
         fi

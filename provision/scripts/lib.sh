@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================
-#  lib.sh  —  Shared functions for all pizero2 scripts
+#  lib.sh  —  Shared functions for all provision scripts
 #  Source this file; never execute directly.
 # =============================================================
 
@@ -148,5 +148,7 @@ set_config_txt() {
 ensure_config_line() {
     local line="$1"
     local cfg="/boot/firmware/config.txt"
-    grep -qF "^${line}" "$cfg" 2>/dev/null || echo "$line" >> "$cfg"
+    # -qxF: whole-line, fixed-string match (no regex — a literal `^` here would
+    # never match, re-appending the line on every run).
+    grep -qxF "$line" "$cfg" 2>/dev/null || echo "$line" >> "$cfg"
 }

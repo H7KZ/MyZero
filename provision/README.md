@@ -20,22 +20,24 @@ sudo bash ~/provision/scripts/install.sh
 
 ## pizero.conf — all your settings
 
-| Setting | Default | Description |
-|---|---|---|
-| `WIFI_SSID` | — | Your home network name **(required)** |
-| `WIFI_PASSWORD` | — | Your home network password **(required)** |
-| `WIFI_COUNTRY` | `DE` | 2-letter ISO country code (DE CZ GB US AT…) |
-| `WIFI_SECURITY` | `wpa2` | `wpa2` or `wpa3` |
-| `HOTSPOT_SSID` | `PiZero-Fallback` | Fallback AP name |
-| `HOTSPOT_PASSWORD` | `raspberry` | Fallback AP password |
-| `HOTSPOT_IP` | `10.42.0.1` | Pi's IP inside the hotspot |
-| `HOTSPOT_CHANNEL` | `6` | Default 2.4 GHz channel (1, 6, or 11 recommended) |
-| `HOTSPOT_TIMEOUT` | `60` | Seconds before raising hotspot |
-| `PI_HOSTNAME` | `raspberry` | Sets `raspberry.local` via mDNS |
-| `TIMEZONE` | `Europe/Berlin` | Any tz from `/usr/share/zoneinfo/` |
-| `SSH_PUBLIC_KEY` | `""` | Paste `~/.ssh/id_ed25519.pub` here |
-| `HEADLESS` | `no` | `yes` = disable HDMI, free ~224 MB RAM |
-| `OVERCLOCK` | `none` | `none` / `safe` (1.2 GHz) / `power` (700 MHz) |
+| Setting            | Default           | Description                                       |
+|--------------------|-------------------|---------------------------------------------------|
+| `WIFI_SSID`        | —                 | Your home network name **(required)**             |
+| `WIFI_PASSWORD`    | —                 | Your home network password **(required)**         |
+| `WIFI_COUNTRY`     | `DE`              | 2-letter ISO country code (DE CZ GB US AT…)       |
+| `WIFI_SECURITY`    | `wpa2`            | `wpa2` or `wpa3`                                  |
+| `HOTSPOT_SSID`     | `PiZero-Fallback` | Fallback AP name                                  |
+| `HOTSPOT_PASSWORD` | `raspberry`       | Fallback AP password                              |
+| `HOTSPOT_IP`       | `10.42.0.1`       | Pi's IP inside the hotspot                        |
+| `HOTSPOT_CHANNEL`  | `6`               | Default 2.4 GHz channel (1, 6, or 11 recommended) |
+| `HOTSPOT_TIMEOUT`  | `60`              | Seconds before raising hotspot                    |
+| `PI_HOSTNAME`      | `raspberry`       | Sets `raspberry.local` via mDNS                   |
+| `TIMEZONE`         | `Europe/Berlin`   | Any tz from `/usr/share/zoneinfo/`                |
+| `SSH_PUBLIC_KEY`   | `""`              | Paste `~/.ssh/id_ed25519.pub` here                |
+| `HEADLESS`         | `no`              | `yes` = disable HDMI, free ~224 MB RAM            |
+| `OVERCLOCK`        | `none`            | `none` / `safe` (1.2 GHz) / `power` (700 MHz)     |
+| `INSTALL_VOICE_ASSISTANT` | `no`       | `yes` = install libvosk + voice-assistant binary + service |
+| `VOSK_VERSION`     | `0.3.45`          | libvosk release to download for the runtime `.so` |
 
 ---
 
@@ -85,20 +87,21 @@ Physical radio (CYW43438)
 
 **Hardware constraint:** both interfaces must use the same channel.
 `hotspot-start.sh` detects `wlan0`'s active channel with `iw dev wlan0 info`
-and patches the hostapd config to match before starting. If `wlan0` is not
-connected, the channel from `pizero.conf` (`HOTSPOT_CHANNEL`) is used.
+and patches the hostapd config to match before starting. If `wlan0` is not connected, the channel from `pizero.conf`
+(`HOTSPOT_CHANNEL`) is used.
 
 **What happens at boot:**
 
 1. `pizero-hotspot.service` starts the watchdog (`wifi-watchdog.sh`)
-2. Watchdog waits up to `HOTSPOT_TIMEOUT` seconds for `wlan0` to get an IP
-   **and** for the gateway to respond to ping (IP alone isn't enough)
+2. Watchdog waits up to `HOTSPOT_TIMEOUT` seconds for `wlan0` to get an IP **and** for the gateway to respond to ping
+   (IP alone isn't enough)
 3. **If home WiFi connects** → watchdog enters normal mode, checks every 45 s
 4. **If no WiFi** → watchdog creates `uap0`, starts hostapd + dnsmasq → hotspot up
 5. Every 30 s in hotspot mode → briefly checks if home network came back
 6. **If home WiFi returns** → hotspot drops, `uap0` deleted, `wlan0` takes over
 
 **Connect to the hotspot:**
+
 1. Join `PiZero-Fallback` (password: `raspberry`)
 2. SSH in:
    ```bash
@@ -107,6 +110,7 @@ connected, the channel from `pizero.conf` (`HOTSPOT_CHANNEL`) is used.
    ```
 
 **Manual control:**
+
 ```bash
 sudo pizero-hotspot-start     # force hotspot on
 sudo pizero-hotspot-stop      # force hotspot off
@@ -128,6 +132,7 @@ sudo bash ~/provision/scripts/pizero-headless.sh status  # show state
 ```
 
 Headless mode:
+
 - Disables HDMI output (~14 mA saved)
 - Reduces CMA from 256 MB to 32 MB (~224 MB freed)
 - Disables Bluetooth and audio
@@ -136,12 +141,15 @@ Headless mode:
 
 ---
 
-## Re-running
+## Re-running (this is the update path)
 
-Safe to run multiple times — all steps are idempotent:
+Re-running **is** how you update the Pi. Edit `pizero.conf` or any file under
+`configs/`/`templates/`, copy the folder over again, and re-run — every step is
+idempotent (`cp -f` overwrites, appends are guarded), so the Pi converges to the
+new state without duplicating anything:
 
 ```bash
-sudo bash ~/provision/scripts/install.sh           # apply / re-apply
+sudo bash ~/provision/scripts/install.sh           # apply / re-apply (= update)
 sudo bash ~/provision/scripts/install.sh --dry-run # preview only
 ```
 
@@ -150,6 +158,7 @@ sudo bash ~/provision/scripts/install.sh --dry-run # preview only
 ## Troubleshooting
 
 **WiFi not connecting after reboot:**
+
 ```bash
 nmcli device status
 nmcli connection show
@@ -158,6 +167,7 @@ cat /etc/NetworkManager/system-connections/pizero-home.nmconnection
 ```
 
 **Hotspot not appearing:**
+
 ```bash
 sudo journalctl -t pizero-wifi-watchdog --no-pager -n 50
 sudo journalctl -t hostapd --no-pager -n 30
@@ -167,6 +177,7 @@ rfkill list
 ```
 
 **Clients connect to hotspot but get no IP:**
+
 ```bash
 cat /run/pizero-dnsmasq.log
 ss -tulnp | grep ':53 '    # check for port 53 conflicts
@@ -174,6 +185,7 @@ ss -tulnp | grep ':67 '    # check DHCP port
 ```
 
 **Check hotspot interface:**
+
 ```bash
 ip link show uap0           # should show UP when hotspot is active
 ip addr show uap0           # should show 10.42.0.1/24
@@ -183,16 +195,13 @@ ip addr show uap0           # should show 10.42.0.1/24
 
 ## Design notes
 
-- **WPA2-PSK only** — WPA3/SAE is broken on the CYW43438 firmware; attempting
-  it causes all client authentication to fail at the handshake phase.
-- **No `feature_disable` flags in brcmfmac** — disabling firmware features
-  (especially the 4-way handshake, 0x002000) breaks WPA2 on many APs.
-  Only `roamoff=1` is set.
-- **NM powersave disabled** — `wifi.powersave=2` (disabled) in the NM config.
-  The CYW43438 drops connections with power saving enabled.
-- **Watchdog has no `set -euo pipefail`** — by design. It runs forever and
-  must survive any transient command failure. Systemd `Restart=always` handles
-  unexpected exits.
+- **WPA2-PSK only** — WPA3/SAE is broken on the CYW43438 firmware; attempting it causes all client authentication to
+  fail at the handshake phase.
+- **No `feature_disable` flags in brcmfmac** — disabling firmware features (especially the 4-way handshake, 0x002000)
+  breaks WPA2 on many APs. Only `roamoff=1` is set.
+- **NM powersave disabled** — `wifi.powersave=2` (disabled) in the NM config. The CYW43438 drops connections with power
+  saving enabled.
+- **Watchdog has no `set -euo pipefail`** — by design. It runs forever and must survive any transient command failure.
+  Systemd `Restart=always` handles unexpected exits.
 - **Runtime configs under `/run/`** — hostapd and dnsmasq are patched to
-  `/run/pizero-*.conf` at start time. The installed `/etc/` configs are
-  never modified at runtime.
+  `/run/pizero-*.conf` at start time. The installed `/etc/` configs are never modified at runtime.
