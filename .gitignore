@@ -1,2 +1,3 @@
 /target
 .env
+/provision/pizero.conf

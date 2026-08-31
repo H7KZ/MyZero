@@ -1,0 +1,63 @@
+# =============================================================
+#  pizero.conf  —  Pi Zero 2 WH Configuration
+#  ─────────────────────────────────────────────────────────────
+#  THIS IS THE ONLY FILE YOU NEED TO EDIT.
+#  All scripts in this package read from here.
+#
+#  After editing, copy the whole provision/ folder to your Pi
+#  and run:  sudo bash scripts/install.sh
+# =============================================================
+
+# ── Wi-Fi ─────────────────────────────────────────────────────
+# Your home network credentials
+WIFI_SSID="YourNetworkName"
+WIFI_PASSWORD="YourPassword"
+
+# 2-letter ISO 3166 country code  (DE CZ GB US AT CH FR NL PL ...)
+WIFI_COUNTRY="CZ"
+
+# wpa2  = WPA2-Personal (most routers, recommended)
+# wpa3  = WPA3-Personal (requires WPA3-capable router)
+WIFI_SECURITY="wpa3"
+
+# ── Fallback Hotspot ──────────────────────────────────────────
+# Raised automatically when home WiFi is unreachable at boot
+HOTSPOT_SSID="PiZero-Fallback"
+HOTSPOT_PASSWORD="raspberry"
+
+# IP address the Pi takes inside the hotspot network
+HOTSPOT_IP="10.42.0.1"
+
+# 2.4 GHz channel (1-13). Channel 1, 6, or 11 avoid overlap.
+HOTSPOT_CHANNEL="6"
+
+# Seconds to wait for home WiFi before raising hotspot
+HOTSPOT_TIMEOUT="60"
+
+# ── System ────────────────────────────────────────────────────
+# Hostname — becomes <hostname>.local via mDNS
+# Use only lowercase letters, numbers, hyphens. No dots.
+PI_HOSTNAME="raspberry"
+
+# Timezone — any valid tz from /usr/share/zoneinfo/
+# Examples: Europe/Berlin  Europe/Prague  America/New_York
+TIMEZONE="Europe/Prague"
+
+# ── SSH ───────────────────────────────────────────────────────
+# Paste the full line from ~/.ssh/id_ed25519.pub or id_rsa.pub
+# Leave empty string ("") to skip — password auth still works
+SSH_PUBLIC_KEY=""
+
+# ── Headless mode ─────────────────────────────────────────────
+# Set to "yes" ONLY if a monitor will NEVER be connected.
+# Disables HDMI/audio/BT, reduces CMA 256→32 MB (~224 MB freed),
+# enables hardware watchdog, trims boot time.
+# Use pizero-headless.sh to toggle this safely after install.
+HEADLESS="no"
+
+# ── Performance ───────────────────────────────────────────────
+# Overclock preset:
+#   none   = stock 1000 MHz, no changes
+#   safe   = 1200 MHz (requires heatsink or thermal case!)
+#   power  = 700 MHz low-power mode (longer battery / cooler)
+OVERCLOCK="none"

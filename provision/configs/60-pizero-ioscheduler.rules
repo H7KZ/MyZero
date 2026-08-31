@@ -1,0 +1,11 @@
+# /etc/udev/rules.d/60-pizero-ioscheduler.rules
+# I/O scheduler tuning for SD card on Pi Zero 2 WH
+#
+# mq-deadline: enforces read/write deadlines, prevents write-starvation,
+# better than 'none'/'noop' for mixed I/O on SD cards.
+
+ACTION=="add|change", KERNEL=="mmcblk[0-9]", ATTR{queue/scheduler}="mq-deadline"
+ACTION=="add|change", KERNEL=="mmcblk[0-9]", ATTR{bdi/read_ahead_kb}="1024"
+ACTION=="add|change", KERNEL=="mmcblk[0-9]", ATTR{queue/iosched/read_expire}="300"
+ACTION=="add|change", KERNEL=="mmcblk[0-9]", ATTR{queue/iosched/write_expire}="3000"
+ACTION=="add|change", KERNEL=="mmcblk[0-9]", ATTR{queue/iosched/front_merges}="0"

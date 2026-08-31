@@ -1,0 +1,10 @@
+# /etc/default/earlyoom
+# Kill memory-hungry processes early before kernel OOM killer freezes system.
+# Critical on 512 MB RAM — prevents the Pi hanging under heavy load.
+#
+# -m 10   kill when free memory < 10%  (~41 MB on 416 MB system)
+# -s 10   kill when free swap < 10%
+# --prefer  target memory-hungry processes first
+# --avoid   never kill these — sshd keeps remote access, systemd/NM keep network
+# -n        send desktop notification (ignored if no desktop)
+EARLYOOM_ARGS="-m 10 -s 10 --prefer '(^|/)(java|node|python3|chromium|chrome)$' --avoid '(^|/)(sshd|systemd|NetworkManager|hostapd|dnsmasq)$' -n"

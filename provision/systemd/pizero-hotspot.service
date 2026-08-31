@@ -1,0 +1,60 @@
+[Unit]
+Description=Pi Zero 2 WH Wi-Fi Watchdog & Fallback Hotspot
+Documentation=file:///etc/pizero/README.md
+
+# ── Ordering ──────────────────────────────────────────────────
+# Must start after NM is running and has had a chance to connect.
+# We do NOT use network-online.target — that would block forever
+# if there is no internet, which is exactly the case we handle.
+After=network.target NetworkManager.service avahi-daemon.service
+Wants=network.target
+
+# Requires NM to be running (we use nmcli to inspect its state).
+# If NM is stopped we cannot do anything useful.
+Requires=NetworkManager.service
+
+# If NM restarts we restart too, so we re-evaluate the WiFi state
+# instead of looping with stale connection state.
+PartOf=NetworkManager.service
+
+[Service]
+Type=simple
+
+ExecStart=/usr/local/lib/pizero/wifi-watchdog.sh
+
+# On stop: run the teardown script to remove uap0, stop hostapd/dnsmasq,
+# and cleanly return wlan0 to NM. The watchdog process is then killed.
+ExecStop=/usr/local/lib/pizero/hotspot-stop.sh
+
+# ── Restart policy ────────────────────────────────────────────
+# Always restart — the watchdog must never stay dead.
+# 10 s delay avoids tight restart loops on hard failures.
+Restart=always
+RestartSec=10s
+
+# ── Environment ───────────────────────────────────────────────
+# hotspot.env is written by install.sh from pizero.conf values.
+# Contains HOTSPOT_IP, HOTSPOT_TIMEOUT, HOTSPOT_SSID, PI_HOSTNAME.
+EnvironmentFile=/etc/pizero/hotspot.env
+
+# ── Process management ────────────────────────────────────────
+# KillMode=process: systemd kills only the watchdog process itself
+# (not the process group). This lets ExecStop run hostapd/dnsmasq
+# cleanup without systemd racing to kill those processes first.
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStartSec=90s
+TimeoutStopSec=25s
+
+# ── Logging ───────────────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pizero-hotspot
+
+# ── Security ──────────────────────────────────────────────────
+User=root
+# NoNewPrivileges is OFF — hostapd/iw need various capabilities
+# that would be blocked by NoNewPrivileges=yes.
+
+[Install]
+WantedBy=multi-user.target
