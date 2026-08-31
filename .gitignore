@@ -3,3 +3,5 @@
 /provision/pizero.conf
 /apps/voice-assistant/models/*
 !/apps/voice-assistant/models/README.md
+/provision/bin/*
+!/provision/bin/.gitkeep

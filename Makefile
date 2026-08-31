@@ -5,7 +5,8 @@ BIN    ?= departure-board
 
 .PHONY: build deploy ship check run
 
-# Builds the whole workspace (all apps) for the Pi.
+# Builds the whole workspace for the Pi.
+# The cross Docker image downloads aarch64 libvosk at image-build time (see Cross.toml).
 build:
 	cross build --target $(TARGET) --release
 
