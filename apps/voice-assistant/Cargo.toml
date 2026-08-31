@@ -1,0 +1,12 @@
+[package]
+name = "voice-assistant"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "voice-assistant"
+path = "src/main.rs"
+
+# Phase 3: pure-std Wake-on-LAN. Voice stack (rustpotter/vosk/piper) and
+# board-hal feedback land in Phase 4.
+[dependencies]

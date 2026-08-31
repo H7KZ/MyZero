@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/board-hal",
     "apps/departure-board",
+    "apps/voice-assistant",
 ]
 
 # Shared dependency versions — apps/crates pull these via `{ workspace = true }`.

@@ -70,6 +70,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "843867be96c8daad0d758b57df9392b6d8d271134fce549de6ce169ff98a92af"
 
 [[package]]
+name = "board-hal"
+version = "0.1.0"
+dependencies = [
+ "embedded-graphics",
+ "linux-embedded-hal",
+ "rppal",
+ "sh1106",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -183,14 +193,11 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 name = "departure-board"
 version = "0.1.0"
 dependencies = [
+ "board-hal",
  "chrono",
- "embedded-graphics",
- "linux-embedded-hal",
  "reqwest",
- "rppal",
  "serde",
  "serde_json",
- "sh1106",
  "tokio",
 ]
 
@@ -1680,6 +1687,10 @@ name = "utf8_iter"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6c140620e7ffbb22c2dee59cafe6084a59b5ffc27a8859a5f0d494b5d52b6be"
+
+[[package]]
+name = "voice-assistant"
+version = "0.1.0"
 
 [[package]]
 name = "void"
