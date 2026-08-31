@@ -7,6 +7,12 @@ edition = "2021"
 name = "voice-assistant"
 path = "src/main.rs"
 
-# Phase 3: pure-std Wake-on-LAN. Voice stack (rustpotter/vosk/piper) and
-# board-hal feedback land in Phase 4.
 [dependencies]
+# Shared breadboard hardware (LED, OLED feedback)
+board-hal = { path = "../../crates/board-hal" }
+
+# Voice pipeline — all offline, all local:
+rustpotter = "3"   # wake-word detection (pure Rust, locally trained)
+vosk = "0.3"       # speech-to-text (links native libvosk)
+cpal = "0.15"      # microphone capture (ALSA on the Pi)
+# Piper (TTS) is invoked as an external CLI — no crate dependency.

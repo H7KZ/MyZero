@@ -1,3 +1,5 @@
 /target
 .env
 /provision/pizero.conf
+/apps/voice-assistant/models/*
+!/apps/voice-assistant/models/README.md
