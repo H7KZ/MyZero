@@ -1,0 +1,15 @@
+# Extras for cross-compiling to the Pi Zero 2 (aarch64).
+#
+# departure-board needs nothing here. voice-assistant's cpal dependency needs
+# ALSA dev headers in the build image; installed below for the target arch.
+#
+# NOTE: voice-assistant's vosk dependency also needs an aarch64 `libvosk` on the
+# linker path inside the container — supply it yourself (see the app README).
+# Building voice-assistant natively on the Pi is often simpler.
+
+[target.aarch64-unknown-linux-gnu]
+pre-build = [
+    "dpkg --add-architecture $CROSS_DEB_ARCH",
+    "apt-get update",
+    "apt-get install -y libasound2-dev:$CROSS_DEB_ARCH",
+]
