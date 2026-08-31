@@ -1,0 +1,17 @@
+[package]
+name = "departure-board"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "departure-board"
+path = "src/main.rs"
+
+[dependencies]
+board-hal = { path = "../../crates/board-hal" }
+
+tokio = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }

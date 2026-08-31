@@ -1,11 +1,8 @@
 mod api;
 mod board;
-mod button;
 mod config;
-mod display;
-mod led;
-mod motion;
 
+use board_hal::{button, display, led, motion};
 use std::time::{Duration, Instant};
 
 struct ActiveState {
