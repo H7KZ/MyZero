@@ -1,7 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/board-hal",
+    "crates/devices",
+    "crates/audio",
+    "crates/net",
     "apps/departure-board",
     "apps/voice-assistant",
 ]
@@ -13,6 +15,9 @@ rppal = "0.22.1"
 sh1106 = "0.5.0"
 embedded-graphics = "0.8.2"
 linux-embedded-hal = "0.3.2"
+
+# Audio capture (mic on the USB sound card, via ALSA)
+cpal = "0.15"
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }

@@ -4,7 +4,8 @@
 //! with the matcher is what makes recognition fast and misfire-resistant: the
 //! recognizer can only ever return one of these phrases (or `[unk]`).
 
-use crate::{config, wol};
+use crate::config;
+use net::wol;
 
 /// Phrases Vosk is allowed to recognize. `[unk]` catches everything else.
 pub const GRAMMAR: &[&str] = &["zapni počítač", "vypni počítač", "[unk]"];

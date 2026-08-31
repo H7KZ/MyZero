@@ -1,7 +1,7 @@
 //! Microphone capture via cpal.
 //!
 //! Opens the default input device as **16 kHz mono i16** and streams samples
-//! over a channel. rustpotter and Vosk both consume this exact format.
+//! over a channel. Vosk (and most on-device speech models) consume this format.
 //!
 //! On the Pi the input device is the USB sound card. If it can't natively do
 //! 16 kHz mono, route it through an ALSA `plug` device (see the app README) —
@@ -45,5 +45,8 @@ pub fn start(sample_rate: u32) -> Result<Capture, String> {
         .map_err(|e| format!("cannot open input stream at {sample_rate} Hz mono i16: {e}"))?;
 
     stream.play().map_err(|e| e.to_string())?;
-    Ok(Capture { _stream: stream, rx })
+    Ok(Capture {
+        _stream: stream,
+        rx,
+    })
 }

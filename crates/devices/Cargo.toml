@@ -1,9 +1,9 @@
 [package]
-name = "board-hal"
+name = "devices"
 version = "0.1.0"
 edition = "2021"
 
-# Shared hardware wrappers for the Pi Zero 2 IO on the breadboard:
+# Shared drivers for the Pi Zero 2's physical peripherals on the breadboard:
 # OLED (SH1106), LED, button, PIR motion sensor. App-agnostic.
 
 [dependencies]

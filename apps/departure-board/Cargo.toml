@@ -8,7 +8,7 @@ name = "departure-board"
 path = "src/main.rs"
 
 [dependencies]
-board-hal = { path = "../../crates/board-hal" }
+devices = { path = "../../crates/devices" }
 
 tokio = { workspace = true }
 reqwest = { workspace = true }

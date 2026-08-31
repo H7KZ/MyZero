@@ -34,15 +34,13 @@ const fn parse_u64(s: &str) -> u64 {
 }
 
 // ── Wake word ─────────────────────────────────────────────────────────────
-/// Spoken wake word (informational; detection uses the trained model below).
+/// Spoken wake word; must match the spelling the Vosk model returns (lowercase).
 pub const WAKE_WORD: &str = env!("WAKE_WORD");
-/// Path to the rustpotter model (.rpw) trained on your "Jarvis" recordings.
-pub const WAKEWORD_MODEL_PATH: &str = env!("WAKEWORD_MODEL_PATH");
 
 // ── Speech-to-text (Vosk) ─────────────────────────────────────────────────
 /// Directory of the unpacked Vosk model (e.g. vosk-model-small-cs).
 pub const VOSK_MODEL_PATH: &str = env!("VOSK_MODEL_PATH");
-/// Capture + recognition sample rate. Vosk/rustpotter expect 16000 Hz mono.
+/// Capture + recognition sample rate. Vosk expects 16000 Hz mono.
 pub const AUDIO_SAMPLE_RATE: u32 = parse_u32(env!("AUDIO_SAMPLE_RATE"));
 /// Seconds to keep transcribing after the wake word before giving up.
 pub const LISTEN_TIMEOUT_SECS: u64 = parse_u64(env!("LISTEN_TIMEOUT_SECS"));

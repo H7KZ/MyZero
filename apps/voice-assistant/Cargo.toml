@@ -8,11 +8,11 @@ name = "voice-assistant"
 path = "src/main.rs"
 
 [dependencies]
-# Shared breadboard hardware (LED, OLED feedback)
-board-hal = { path = "../../crates/board-hal" }
+# Shared workspace crates
+devices = { path = "../../crates/devices" } # LED + OLED feedback
+audio = { path = "../../crates/audio" }     # microphone capture (cpal)
+net = { path = "../../crates/net" }         # wake-on-lan
 
-# Voice pipeline — all offline, all local:
-rustpotter = "3"   # wake-word detection (pure Rust, locally trained)
-vosk = "0.3"       # speech-to-text (links native libvosk)
-cpal = "0.15"      # microphone capture (ALSA on the Pi)
+# Speech — one Vosk model does both wake-word spotting and command recognition.
+vosk = "0.3" # links native libvosk
 # Piper (TTS) is invoked as an external CLI — no crate dependency.

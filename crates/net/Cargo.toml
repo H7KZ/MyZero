@@ -1,0 +1,9 @@
+[package]
+name = "net"
+version = "0.1.0"
+edition = "2021"
+
+# Small networking helpers shared across apps. Pure std — no dependencies, so
+# its unit tests run on any host (not just the Pi).
+
+[dependencies]

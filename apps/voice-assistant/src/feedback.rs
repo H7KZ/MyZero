@@ -1,9 +1,9 @@
 //! Optional visual feedback on the breadboard: a "listening" LED and the OLED.
 //!
 //! Both are optional so the assistant runs headless on any Pi. Hardware access
-//! goes through the shared `board-hal` crate.
+//! goes through the shared `devices` crate.
 
-use board_hal::{display, led::Led};
+use devices::{display, led::Led};
 
 pub struct Feedback {
     led: Option<Led>,

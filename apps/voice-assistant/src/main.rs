@@ -1,17 +1,15 @@
-mod audio;
 mod config;
 mod feedback;
 mod intent;
-mod stt;
+mod speech;
 mod tts;
-mod wake;
-mod wol;
 
+use net::wol;
 use std::time::{Duration, Instant};
 
 /// Offline, all-local voice assistant for the Pi Zero 2.
 ///
-/// Pipeline: mic (cpal) → wake word (rustpotter) → command (Vosk grammar)
+/// Pipeline: mic (`audio`) → wake word + command (`speech`, one Vosk model)
 ///           → intent → action (Wake-on-LAN, …) + spoken reply (Piper).
 ///
 /// Usage:
@@ -21,7 +19,6 @@ use std::time::{Duration, Instant};
 ///   voice-assistant wake-word  print the configured wake word
 fn main() {
     let cmd = std::env::args().nth(1).unwrap_or_else(|| "run".into());
-
     match cmd.as_str() {
         "run" => run(),
         "wol" => send_wol(),
@@ -65,52 +62,40 @@ fn run() {
     println!("Wake word: {}", config::WAKE_WORD);
 
     let mut fb = feedback::Feedback::init(config::LED_GPIO_PIN, config::ENABLE_OLED);
-    let mut wake = wake::WakeWord::new(config::WAKEWORD_MODEL_PATH)
-        .unwrap_or_else(|e| fatal("wake word", e));
-    let mut stt = stt::Stt::new(
+    let mut speech = speech::Speech::new(
         config::VOSK_MODEL_PATH,
         config::AUDIO_SAMPLE_RATE as f32,
+        config::WAKE_WORD,
         intent::GRAMMAR,
     )
-    .unwrap_or_else(|e| fatal("vosk", e));
+    .unwrap_or_else(|e| fatal("speech", e));
 
     let capture = audio::start(config::AUDIO_SAMPLE_RATE).unwrap_or_else(|e| fatal("audio", e));
-    // Keep `_stream` bound (not bare `_`) so the mic keeps running.
-    let audio::Capture { _stream, rx } = capture;
+    // `capture` stays in scope for the whole loop, keeping the mic stream alive.
+    let samples = capture.rx;
 
-    let frame_len = wake.samples_per_frame();
-    let mut buf: Vec<i16> = Vec::with_capacity(frame_len * 2);
     let mut state = State::Idle;
-
     fb.idle(config::WAKE_WORD);
     println!("Ready. Say \"{}\".", config::WAKE_WORD);
 
-    for chunk in rx {
+    for chunk in samples {
         match state {
             State::Idle => {
-                buf.extend_from_slice(&chunk);
-                // rustpotter needs exactly one frame per call.
-                while buf.len() >= frame_len {
-                    let frame: Vec<i16> = buf.drain(..frame_len).collect();
-                    if let Some(det) = wake.process(frame) {
-                        println!("[wake] '{}' score={:.2}", det.name, det.score);
-                        stt.reset();
-                        buf.clear();
-                        fb.listening(config::WAKE_WORD);
-                        state = State::Listening {
-                            since: Instant::now(),
-                        };
-                        break;
-                    }
+                if speech.detect_wake(&chunk) {
+                    println!("[wake] \"{}\" detected", config::WAKE_WORD);
+                    speech.reset_command();
+                    fb.listening(config::WAKE_WORD);
+                    state = State::Listening {
+                        since: Instant::now(),
+                    };
                 }
             }
             State::Listening { since } => {
-                if let Some(text) = stt.accept(&chunk) {
-                    handle(&text, &mut fb);
-                    fb.idle(config::WAKE_WORD);
-                    state = State::Idle;
-                } else if since.elapsed() >= Duration::from_secs(config::LISTEN_TIMEOUT_SECS) {
-                    let text = stt.finalize().unwrap_or_default();
+                let text = speech.accept_command(&chunk).or_else(|| {
+                    (since.elapsed() >= Duration::from_secs(config::LISTEN_TIMEOUT_SECS))
+                        .then(|| speech.finalize_command())
+                });
+                if let Some(text) = text {
                     handle(&text, &mut fb);
                     fb.idle(config::WAKE_WORD);
                     state = State::Idle;
