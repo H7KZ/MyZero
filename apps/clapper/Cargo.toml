@@ -1,0 +1,13 @@
+[package]
+name = "clapper"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "clapper"
+path = "src/main.rs"
+
+[dependencies]
+# Shared workspace crates
+devices = { path = "../../crates/devices" } # sound sensor (D0), LED, OLED
+net = { path = "../../crates/net" }         # wake-on-lan

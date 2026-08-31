@@ -1,0 +1,16 @@
+[Unit]
+Description=MyZero clapper (clap -> Wake-on-LAN)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/home/pi
+ExecStart=/home/pi/clapper
+Restart=on-failure
+RestartSec=5
+User=pi
+# GPIO access for the sound sensor / LED (via /dev/gpiomem).
+SupplementaryGroups=gpio
+
+[Install]
+WantedBy=multi-user.target

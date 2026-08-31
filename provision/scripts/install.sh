@@ -874,44 +874,19 @@ EOF
 }
 
 # ─────────────────────────────────────────────────────────────
-step_voice_assistant() {
-    [[ "${INSTALL_VOICE_ASSISTANT:-no}" != "yes" ]] && return 0
-    section "STEP 10: VOICE ASSISTANT"
-    dry "install voice-assistant" || return 0
+step_clapper() {
+    [[ "${INSTALL_CLAPPER:-no}" != "yes" ]] && return 0
+    section "STEP 10: CLAPPER (clap → Wake-on-LAN)"
+    dry "install clapper" || return 0
 
-    local vosk_ver="${VOSK_VERSION:-0.3.45}"
-    local vosk_zip="vosk-linux-aarch64-${vosk_ver}.zip"
-    local vosk_url="https://github.com/alphacep/vosk-api/releases/download/v${vosk_ver}/${vosk_zip}"
-    local vosk_lib="/usr/local/lib/libvosk.so"
-    local bin_src="${PKG_DIR}/bin/voice-assistant"
-    local bin_dst="/home/${REAL_USER}/voice-assistant"
-
-    # ── libvosk.so ───────────────────────────────────────────────
-    if [[ -f "$vosk_lib" ]]; then
-        log_info "libvosk.so: already installed at ${vosk_lib}"
-    else
-        log_action "Downloading libvosk v${vosk_ver}..."
-        curl -fsSL "$vosk_url" -o "/tmp/${vosk_zip}" \
-            || { log_error "Download failed: ${vosk_url}"; exit 1; }
-        unzip -q "/tmp/${vosk_zip}" -d /tmp/vosk
-        cp "/tmp/vosk/vosk-linux-aarch64-${vosk_ver}/libvosk.so" "$vosk_lib"
-        chmod 755 "$vosk_lib"
-        rm -rf "/tmp/${vosk_zip}" /tmp/vosk
-        log_ok "libvosk.so installed: ${vosk_lib}"
-    fi
-
-    # Ensure dynamic linker picks it up
-    if ! grep -qF "/usr/local/lib" /etc/ld.so.conf.d/local.conf 2>/dev/null; then
-        echo "/usr/local/lib" > /etc/ld.so.conf.d/local.conf
-    fi
-    ldconfig
-    log_ok "ldconfig: /usr/local/lib registered"
+    local bin_src="${PKG_DIR}/bin/clapper"
+    local bin_dst="/home/${REAL_USER}/clapper"
 
     # ── Binary ───────────────────────────────────────────────────
     if [[ ! -f "$bin_src" ]]; then
-        log_warn "voice-assistant binary not found at ${bin_src}"
+        log_warn "clapper binary not found at ${bin_src}"
         log_warn "Cross-compile it first:  make build  (on your dev machine)"
-        log_warn "Then copy to:            provision/bin/voice-assistant"
+        log_warn "Then copy to:            provision/bin/clapper"
     else
         cp -f "$bin_src" "$bin_dst"
         chmod 755 "$bin_dst"
@@ -920,18 +895,18 @@ step_voice_assistant() {
     fi
 
     # ── systemd service ──────────────────────────────────────────
-    cp -f "${PKG_DIR}/systemd/voice-assistant.service" \
-          /etc/systemd/system/voice-assistant.service
+    cp -f "${PKG_DIR}/systemd/clapper.service" \
+          /etc/systemd/system/clapper.service
     systemctl daemon-reload
-    systemctl enable voice-assistant.service
-    log_ok "voice-assistant.service: enabled"
+    systemctl enable clapper.service
+    log_ok "clapper.service: enabled"
 
     if [[ -f "$bin_dst" ]]; then
-        systemctl restart voice-assistant.service 2>/dev/null || true
-        log_ok "voice-assistant.service: started"
+        systemctl restart clapper.service 2>/dev/null || true
+        log_ok "clapper.service: started"
     else
         log_warn "Service enabled but not started — deploy binary first, then:"
-        log_warn "  sudo systemctl start voice-assistant"
+        log_warn "  sudo systemctl start clapper"
     fi
 }
 
@@ -1076,7 +1051,7 @@ main() {
     step_services
     step_tools
     step_hotspot
-    step_voice_assistant
+    step_clapper
     step_cleanup
     step_health
 

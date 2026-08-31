@@ -19,7 +19,7 @@ enum State {
 
 #[tokio::main]
 async fn main() {
-    println!("=== ZeroDepartureBoard ===");
+    println!("=== Departure Board ===");
     println!("Backend:       {}", config::BACKEND_URL);
     println!("Stop fallback: {}", config::STOP_NAME);
     println!("Button pin:    {:?}", config::BUTTON_GPIO_PIN);

@@ -1,7 +1,8 @@
-// Bakes apps/voice-assistant/.env into the binary at compile time.
+// Bakes apps/clapper/.env into the binary at compile time.
 // .env is gitignored (holds the real WoL target MAC); .env.example is the template.
 fn main() {
     println!("cargo:rerun-if-changed=.env");
+    println!("cargo:rustc-link-arg=-Wl,--allow-shlib-undefined");
 
     let content = std::fs::read_to_string(".env").unwrap_or_default();
 

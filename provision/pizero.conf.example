@@ -55,16 +55,12 @@ SSH_PUBLIC_KEY=""
 # Use pizero-headless.sh to toggle this safely after install.
 HEADLESS="no"
 
-# ── Voice assistant ───────────────────────────────────────────
-# Set to "yes" to install libvosk + the voice-assistant binary + systemd service.
+# ── Clapper (clap → Wake-on-LAN) ──────────────────────────────
+# Set to "yes" to install the clapper binary + systemd service.
 # Before running install.sh, cross-compile the binary on your dev machine:
 #   make build
-#   cp target/aarch64-unknown-linux-gnu/release/voice-assistant provision/bin/
-INSTALL_VOICE_ASSISTANT="no"
-
-# Vosk release to download for the runtime libvosk.so.
-# Check https://github.com/alphacep/vosk-api/releases for the latest.
-VOSK_VERSION="0.3.45"
+#   cp target/aarch64-unknown-linux-gnu/release/clapper provision/bin/
+INSTALL_CLAPPER="no"
 
 # ── Performance ───────────────────────────────────────────────
 # Overclock preset:

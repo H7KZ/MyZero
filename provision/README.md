@@ -20,24 +20,23 @@ sudo bash ~/provision/scripts/install.sh
 
 ## pizero.conf — all your settings
 
-| Setting            | Default           | Description                                       |
-|--------------------|-------------------|---------------------------------------------------|
-| `WIFI_SSID`        | —                 | Your home network name **(required)**             |
-| `WIFI_PASSWORD`    | —                 | Your home network password **(required)**         |
-| `WIFI_COUNTRY`     | `DE`              | 2-letter ISO country code (DE CZ GB US AT…)       |
-| `WIFI_SECURITY`    | `wpa2`            | `wpa2` or `wpa3`                                  |
-| `HOTSPOT_SSID`     | `PiZero-Fallback` | Fallback AP name                                  |
-| `HOTSPOT_PASSWORD` | `raspberry`       | Fallback AP password                              |
-| `HOTSPOT_IP`       | `10.42.0.1`       | Pi's IP inside the hotspot                        |
-| `HOTSPOT_CHANNEL`  | `6`               | Default 2.4 GHz channel (1, 6, or 11 recommended) |
-| `HOTSPOT_TIMEOUT`  | `60`              | Seconds before raising hotspot                    |
-| `PI_HOSTNAME`      | `raspberry`       | Sets `raspberry.local` via mDNS                   |
-| `TIMEZONE`         | `Europe/Berlin`   | Any tz from `/usr/share/zoneinfo/`                |
-| `SSH_PUBLIC_KEY`   | `""`              | Paste `~/.ssh/id_ed25519.pub` here                |
-| `HEADLESS`         | `no`              | `yes` = disable HDMI, free ~224 MB RAM            |
-| `OVERCLOCK`        | `none`            | `none` / `safe` (1.2 GHz) / `power` (700 MHz)     |
-| `INSTALL_VOICE_ASSISTANT` | `no`       | `yes` = install libvosk + voice-assistant binary + service |
-| `VOSK_VERSION`     | `0.3.45`          | libvosk release to download for the runtime `.so` |
+| Setting            | Default           | Description                                          |
+|--------------------|-------------------|------------------------------------------------------|
+| `WIFI_SSID`        | —                 | Your home network name **(required)**                |
+| `WIFI_PASSWORD`    | —                 | Your home network password **(required)**            |
+| `WIFI_COUNTRY`     | `DE`              | 2-letter ISO country code (DE CZ GB US AT…)          |
+| `WIFI_SECURITY`    | `wpa2`            | `wpa2` or `wpa3`                                     |
+| `HOTSPOT_SSID`     | `PiZero-Fallback` | Fallback AP name                                     |
+| `HOTSPOT_PASSWORD` | `raspberry`       | Fallback AP password                                 |
+| `HOTSPOT_IP`       | `10.42.0.1`       | Pi's IP inside the hotspot                           |
+| `HOTSPOT_CHANNEL`  | `6`               | Default 2.4 GHz channel (1, 6, or 11 recommended)    |
+| `HOTSPOT_TIMEOUT`  | `60`              | Seconds before raising hotspot                       |
+| `PI_HOSTNAME`      | `raspberry`       | Sets `raspberry.local` via mDNS                      |
+| `TIMEZONE`         | `Europe/Berlin`   | Any tz from `/usr/share/zoneinfo/`                   |
+| `SSH_PUBLIC_KEY`   | `""`              | Paste `~/.ssh/id_ed25519.pub` here                   |
+| `HEADLESS`         | `no`              | `yes` = disable HDMI, free ~224 MB RAM               |
+| `OVERCLOCK`        | `none`            | `none` / `safe` (1.2 GHz) / `power` (700 MHz)        |
+| `INSTALL_CLAPPER`  | `no`              | `yes` = install the clapper binary + systemd service |
 
 ---
 
@@ -144,9 +143,8 @@ Headless mode:
 ## Re-running (this is the update path)
 
 Re-running **is** how you update the Pi. Edit `pizero.conf` or any file under
-`configs/`/`templates/`, copy the folder over again, and re-run — every step is
-idempotent (`cp -f` overwrites, appends are guarded), so the Pi converges to the
-new state without duplicating anything:
+`configs/`/`templates/`, copy the folder over again, and re-run — every step is idempotent (`cp -f` overwrites, appends
+are guarded), so the Pi converges to the new state without duplicating anything:
 
 ```bash
 sudo bash ~/provision/scripts/install.sh           # apply / re-apply (= update)

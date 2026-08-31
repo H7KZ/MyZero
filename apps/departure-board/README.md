@@ -1,4 +1,4 @@
-# ZeroDepartureBoard
+# Departure Board
 
 Public transport departure board on Raspberry Pi Zero 2 WH. PIR motion sensor wakes a 128×64 OLED, which shows upcoming
 departures fetched from a backend API.
@@ -195,7 +195,7 @@ sudo nano /etc/systemd/system/departure-board.service
 
 ```ini
 [Unit]
-Description=ZeroDepartureBoard
+Description=Departure Board
 After=network-online.target
 Wants=network-online.target
 
