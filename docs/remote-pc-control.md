@@ -560,6 +560,10 @@ Each step is independently verifiable, so you always know which one broke.
 every way to build a wake button (phone shortcut, Moonlight's own HTTP wake, ESP32, Zigbee, a real button on the Pi),
 latency tuning, and the things that will annoy you in week one.
 
+[`software-guide.md`](software-guide.md) — what each piece of software is and how it works, for reading before you
+install rather than after: Tailscale's NAT traversal and DERP, why hardware encoding makes Sunshine fast, why RDP is
+sharp on text and hopeless on 3D, and the install order with a gate after each step.
+
 ---
 
 ## Sources

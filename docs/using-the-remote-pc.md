@@ -1,7 +1,8 @@
 # Using the machine: screens, controllers and buttons
 
-[`remote-pc-control.md`](remote-pc-control.md) is the *why* — power states, packet delivery, security. This one is the
-*how*: what to install, what to press, and what it feels like day to day.
+[`remote-pc-control.md`](remote-pc-control.md) is the *why* — power states, packet delivery, security.
+[`software-guide.md`](software-guide.md) explains what each piece of software actually is. This one is the *how*: what
+to press, and what it feels like day to day.
 
 ---
 

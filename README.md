@@ -44,6 +44,8 @@ motherboard's power-switch header through an optocoupler, exactly like the case 
 - [**docs/using-the-remote-pc.md**](docs/using-the-remote-pc.md) — the practical version: Moonlight vs RDP, game
   controllers, every way to build a wake button (phone shortcut, ESP32, Zigbee, a real button on the Pi), and latency
   tuning.
+- [**docs/software-guide.md**](docs/software-guide.md) — what each piece of software actually is and how it works,
+  the install order with a verification gate after every step, and what talks to what.
 
 ## Components on the breadboard
 
