@@ -935,17 +935,24 @@ step_pcctl() {
     # Generated here rather than shipped, so the private half never leaves the
     # Pi. Its public half goes to the PC's Setup-RemotePower.ps1.
     local key="/home/${REAL_USER}/.ssh/id_pcctl"
-    if [[ ! -f "$key" ]]; then
+    if [[ -f "$key" ]]; then
+        log_skip "SSH key already present: ${key}"
+    elif ! command -v ssh-keygen >/dev/null 2>&1; then
+        # Not fatal: waking needs no key at all, only sleep/shutdown do.
+        log_warn "ssh-keygen not found — install openssh-client and re-run to enable sleep/shutdown"
+    else
         sudo -u "${REAL_USER}" mkdir -p "/home/${REAL_USER}/.ssh"
+        chmod 700 "/home/${REAL_USER}/.ssh"
         sudo -u "${REAL_USER}" ssh-keygen -t ed25519 -N "" -C "pcctl@${PI_HOSTNAME}" -f "$key" >/dev/null
         log_ok "Generated ${key}"
-    else
-        log_skip "SSH key already present: ${key}"
     fi
-    log_info "Public key for the PC's Setup-RemotePower.ps1 -PublicKey:"
-    echo ""
-    cat "${key}.pub"
-    echo ""
+
+    if [[ -f "${key}.pub" ]]; then
+        log_info "Public key for the PC's Setup-RemotePower.ps1 -PublicKey:"
+        echo ""
+        cat "${key}.pub"
+        echo ""
+    fi
 
     # ── systemd service ──────────────────────────────────────────
     cp -f "${PKG_DIR}/systemd/pcctl.service" \

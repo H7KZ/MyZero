@@ -84,10 +84,17 @@ function Enable-WakeOnLan {
 
     Log-Action "Arming '$($Nic.Name)' ($($Nic.InterfaceDescription)) for magic packets"
 
-    # WakeOnPattern stays disabled on purpose: pattern wake fires on ordinary
-    # broadcast chatter and the PC would never stay asleep.
-    Set-NetAdapterPowerManagement -Name $Nic.Name -WakeOnMagicPacket Enabled -WakeOnPattern Disabled
-    Log-Ok 'WakeOnMagicPacket = Enabled, WakeOnPattern = Disabled'
+    # Magic-packet wake is the whole point, so a failure here is fatal.
+    Set-NetAdapterPowerManagement -Name $Nic.Name -WakeOnMagicPacket Enabled
+    Log-Ok 'WakeOnMagicPacket = Enabled'
+
+    # Pattern wake stays disabled on purpose: it fires on ordinary broadcast
+    # chatter and the PC would never stay asleep. Best-effort — plenty of
+    # drivers don't expose it at all, and that's fine.
+    try {
+        Set-NetAdapterPowerManagement -Name $Nic.Name -WakeOnPattern Disabled -ErrorAction Stop
+        Log-Ok 'WakeOnPattern = Disabled'
+    } catch { Log-Skip 'WakeOnPattern not supported by this driver' }
 
     # Driver-level keyword, which some vendors gate independently of the above.
     foreach ($keyword in '*WakeOnMagicPacket', 'Wake on Magic Packet') {
@@ -115,15 +122,44 @@ function Enable-WakeOnLan {
         Log-Warn "powercfg does not list '$($Nic.InterfaceDescription)' as wake-programmable — check the BIOS first"
     }
 
-    # "Allow the computer to turn off this device to save power": bit 0x100 of
-    # PnPCapabilities means "no power management for this device".
-    $key = Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}' |
-        Where-Object { (Get-ItemProperty $_.PSPath -Name NetCfgInstanceId -ErrorAction SilentlyContinue).NetCfgInstanceId -eq $Nic.InterfaceGuid }
-    if ($key) {
-        Set-ItemProperty -Path $key.PSPath -Name PnPCapabilities -Value 0x100 -Type DWord
-        Log-Ok 'PnPCapabilities = 0x100 (Windows may not power the NIC down)'
-    } else {
-        Log-Warn 'Could not locate the adapter class key — set "Allow the computer to turn off this device" by hand'
+    Disable-NicPowerSaving -Nic $Nic
+}
+
+function Disable-NicPowerSaving {
+    param($Nic)
+
+    # Deliberately NOT the PnPCapabilities registry value. Its bit meanings are
+    # inconsistently documented, and the value most guides copy — 24 (0x18) —
+    # disables the adapter's *wake* capability as well as its power-down,
+    # quietly undoing everything above. This WMI class flips exactly the one
+    # checkbox and nothing else.
+    try {
+        $pnp = (Get-CimInstance Win32_NetworkAdapter -Filter "GUID='$($Nic.InterfaceGuid)'" -ErrorAction Stop).PNPDeviceID
+        if (-not $pnp) { throw 'adapter reports no PNPDeviceID' }
+
+        $entries = @(Get-CimInstance -Namespace root\wmi -ClassName MSPower_DeviceEnable -ErrorAction Stop |
+            Where-Object { $_.InstanceName.StartsWith($pnp, [StringComparison]::OrdinalIgnoreCase) })
+        if (-not $entries) { throw "no MSPower_DeviceEnable entry matching $pnp" }
+
+        foreach ($entry in $entries) {
+            try {
+                Set-CimInstance -InputObject $entry -Property @{ Enable = $false } -ErrorAction Stop
+            } catch {
+                # Some driver stacks reject the CIM write but accept the older
+                # WMI Put(). Only reachable on Windows PowerShell 5.1, where
+                # Get-WmiObject still exists.
+                if (-not (Get-Command Get-WmiObject -ErrorAction SilentlyContinue)) { throw }
+                $legacy = Get-WmiObject -Namespace root\wmi -Class MSPower_DeviceEnable |
+                    Where-Object { $_.InstanceName -eq $entry.InstanceName }
+                $legacy.Enable = $false
+                [void]$legacy.Put()
+            }
+        }
+        Log-Ok '"Allow the computer to turn off this device to save power" unchecked'
+    } catch {
+        Log-Warn "Could not disable NIC power saving automatically: $($_.Exception.Message)"
+        Log-Warn 'Uncheck it by hand — Device Manager -> the adapter -> Power Management ->'
+        Log-Warn '  "Allow the computer to turn off this device to save power"'
     }
 }
 
@@ -331,4 +367,5 @@ Show-Report -Nic $nic
 
 Section 'Still to do by hand'
 Log-Warn 'BIOS/UEFI: enable "Wake on LAN" / "Resume by PCI-E Device" / "Power On by PCIE", and set ErP/EuP Ready to Disabled.'
-Log-Warn 'Verify from the Pi:  pcctl status  →  ssh ... sleep  →  pcctl wake --wait'
+Log-Warn 'Some driver keyword changes only take effect after a reboot (or Restart-NetAdapter).'
+Log-Warn 'Verify from the Pi:  pcctl status  ->  pcctl sleep  ->  pcctl wake --wait'
