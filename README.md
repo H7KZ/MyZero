@@ -8,18 +8,36 @@ the OS provisioning that sets the Pi up.
 ```
 crates/
   devices/            OLED, LED, button, PIR motion, sound sensor drivers
-  net/                wake-on-lan
+  net/                wake-on-lan + TCP liveness probe
 apps/
   departure-board/    PIR-woken OLED public-transport departure board
   clapper/            clap on the sound sensor → Wake-on-LAN your PC
+  pcctl/              wake / sleep / shut down the PC — CLI + HTTP control API
+docs/                 design notes
 provision/            OS setup/hardening (WiFi, hotspot, headless, systemd)
+  pc/windows/         scripts that run on the *PC*: arm WoL, SSH power hook
 Makefile              build / deploy / run helpers
 ```
 
 Each part has its own README:
 [devices](crates/devices/README.md) · [net](crates/net/README.md) ·
 [departure-board](apps/departure-board/README.md) ·
-[clapper](apps/clapper/README.md) · [provision](provision/README.md)
+[clapper](apps/clapper/README.md) · [pcctl](apps/pcctl/README.md) ·
+[provision](provision/README.md) · [PC side](provision/pc/windows/README.md)
+
+## Remote PC control
+
+The Pi is always on and sits on the PC's LAN segment, so it can do the one thing a VPN can't: put a layer-2 magic
+packet on the wire. `pcctl` turns that into a wake / sleep / shut-down button you can press from anywhere:
+
+```
+laptop ──Tailscale──▶ Pi ──magic packet──▶ PC ◀──Moonlight / RDP── laptop
+                       └──ssh forced command──▶ sleep
+```
+
+[**docs/remote-pc-control.md**](docs/remote-pc-control.md) is the deep version: power states and why Fast Startup
+breaks WoL, ARP-cache failures, getting in from outside, remote-shutdown mechanics, Sunshine/Moonlight vs RDP, the
+security review, and a step-by-step build order.
 
 ## Components on the breadboard
 
@@ -44,15 +62,17 @@ make ship BIN=departure-board       # build + scp a chosen app to the Pi
 make run  BIN=clapper               # ssh + run it
 ```
 
-Both apps cross-compile cleanly with plain `cross` — they're `rppal` GPIO + std (departure-board also HTTP/JSON), no
-native audio/ML libraries. The Rust HW crates are Linux-only, so on a Windows/macOS host only `net`'s pure-std WoL unit
-tests run (`cargo test -p net`).
+All three apps cross-compile cleanly with plain `cross` — they're `rppal` GPIO + std (departure-board also HTTP/JSON),
+no native audio/ML libraries. `pcctl` uses no GPIO at all, so it builds and runs on your laptop too. The Rust HW crates
+are Linux-only, so on a Windows/macOS host only the pure-std parts test (`cargo test -p net -p pcctl`).
 
 ## Config & secrets
 
 Each app bakes config from a **gitignored `.env`** at compile time (via
 `build.rs`); a committed `.env.example` documents the keys. `provision` uses the same pattern (`pizero.conf` gitignored,
-`pizero.conf.example` committed). Real secrets — WiFi password, SSH key, the PC's MAC — never enter git.
+`pizero.conf.example` committed). Real secrets — WiFi password, SSH key, the PC's MAC, the `pcctl` API token — never
+enter git. `pcctl` additionally falls back to its `.env.example` when no `.env` exists, so a fresh clone still builds
+(with a `cargo:warning` saying it used placeholders).
 
 ## Status
 
@@ -61,5 +81,7 @@ Each app bakes config from a **gitignored `.env`** at compile time (via
 | Cargo workspace + `devices` / `net`                 | ✅               |
 | `departure-board`                                   | ✅ builds for Pi |
 | `clapper` (clap → Wake-on-LAN)                      | ✅ builds for Pi |
+| `pcctl` (wake / sleep / shutdown, CLI + HTTP API)   | ✅ builds + tested |
+| PC-side setup (`provision/pc/windows`)              | ⏳ needs a real PC |
 | `provision/` OS setup (idempotent, re-run = update) | ✅               |
 | Validate on real hardware (sensor wiring, PC WoL)   | ⏳               |
