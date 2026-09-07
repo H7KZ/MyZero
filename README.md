@@ -7,13 +7,13 @@ the OS provisioning that sets the Pi up.
 
 ```
 crates/
-  devices/            OLED, LED, button, PIR motion, sound sensor drivers
+  devices/            OLED, LED, button, PIR motion, sound sensor, power-switch drivers
   net/                wake-on-lan + TCP liveness probe
 apps/
   departure-board/    PIR-woken OLED public-transport departure board
   clapper/            clap on the sound sensor → Wake-on-LAN your PC
   pcctl/              wake / sleep / shut down the PC — CLI + HTTP control API
-docs/                 design notes
+docs/                 design + usage notes
 provision/            OS setup/hardening (WiFi, hotspot, headless, systemd)
   pc/windows/         scripts that run on the *PC*: arm WoL, SSH power hook
 Makefile              build / deploy / run helpers
@@ -35,9 +35,15 @@ laptop ──Tailscale──▶ Pi ──magic packet──▶ PC ◀──Moonl
                        └──ssh forced command──▶ sleep
 ```
 
-[**docs/remote-pc-control.md**](docs/remote-pc-control.md) is the deep version: power states and why Fast Startup
-breaks WoL, ARP-cache failures, getting in from outside, remote-shutdown mechanics, Sunshine/Moonlight vs RDP, the
-security review, and a step-by-step build order.
+When the network can't help — a board that won't arm its NIC, a hung OS — `pcctl press` closes a contact across the
+motherboard's power-switch header through an optocoupler, exactly like the case button.
+
+- [**docs/remote-pc-control.md**](docs/remote-pc-control.md) — the deep version: power states and why Fast Startup
+  breaks WoL, ARP-cache failures, getting in from outside, remote-shutdown mechanics, the security review, and a
+  step-by-step build order.
+- [**docs/using-the-remote-pc.md**](docs/using-the-remote-pc.md) — the practical version: Moonlight vs RDP, game
+  controllers, every way to build a wake button (phone shortcut, ESP32, Zigbee, a real button on the Pi), and latency
+  tuning.
 
 ## Components on the breadboard
 
@@ -82,6 +88,7 @@ enter git. `pcctl` additionally falls back to its `.env.example` when no `.env` 
 | `departure-board`                                   | ✅ builds for Pi |
 | `clapper` (clap → Wake-on-LAN)                      | ✅ builds for Pi |
 | `pcctl` (wake / sleep / shutdown, CLI + HTTP API)   | ✅ builds + tested |
+| `powerswitch` front-panel fallback (GPIO + opto)    | ⏳ needs wiring   |
 | PC-side setup (`provision/pc/windows`)              | ⏳ needs a real PC |
 | `provision/` OS setup (idempotent, re-run = update) | ✅               |
 | Validate on real hardware (sensor wiring, PC WoL)   | ⏳               |

@@ -431,6 +431,7 @@ by itself — which is exactly why `pcctl` serves `/wake` over GET as well as PO
 | "Is it up?" TCP probe                  | [`crates/net/src/probe.rs`](../crates/net/src/probe.rs)   |
 | CLI + HTTP control API                 | [`apps/pcctl`](../apps/pcctl/README.md)                   |
 | Clap → wake, from the sofa             | [`apps/clapper`](../apps/clapper/README.md)               |
+| Front-panel switch + power-LED sense   | [`crates/devices/src/powerswitch.rs`](../crates/devices/src/powerswitch.rs) |
 | PC-side setup + power dispatcher       | [`provision/pc/windows`](../provision/pc/windows/)        |
 | Service + installer wiring             | `provision/systemd/pcctl.service`, `INSTALL_PCCTL=yes`    |
 
@@ -454,16 +455,35 @@ A triage order, cheapest test first:
 
 ### The fallback that always works: press the button
 
-If the NIC is dead, the OS is hung, or the board simply refuses to be woken, there's a mechanism that doesn't care:
-**short the PWR_SW header for 200 ms**, exactly like the case button, and hold it 5 s for a hard power-off.
+If the NIC is dead, the OS is hung, or the board refuses to be woken, there's a mechanism that doesn't care about any
+of it: **close the PWR_SW contact**, exactly like the case button.
 
-Wire a Pi GPIO through an **optocoupler** (PC817 and friends) or a small relay to the header's two pins. The
-optocoupler is the better choice — it keeps the Pi's ground and the PC's ground galvanically separate, which is what
-you want between two devices with their own PSUs. Drive it high for 200 ms to press, 5 s to force off.
+```sh
+pcctl press               # ~250 ms — the ACPI power event
+pcctl force-off --yes     # ~6 s — the ATX hard cut
+pcctl reset --yes         # the reset header
+```
 
-This is the honest escape hatch for Modern Standby laptops and stubborn boards, and it doubles as remote *reset* when
-something hangs. It's the natural next app in this repo — `devices` already has the GPIO output layer that `led.rs`
-uses.
+Wire a Pi GPIO through an **optocoupler** (PC817 and friends) to the header's two pins, in parallel with the case
+button. The optocoupler rather than a direct wire or a relay: it keeps the Pi's ground and the PC's ground galvanically
+separate, which is what you want between two devices with their own PSUs, and it's silent and instant.
+
+Three rules make this safe rather than alarming, and they're enforced in code:
+
+- **The GPIO must be BCM 9–27.** Pins 0–8 boot with internal pull-*ups*, which would assert the optocoupler — holding
+  the power button down — for the ~20 seconds between the Pi powering up and `pcctl` claiming the pin. That force-offs
+  a running PC or stops a stopped one from starting. `PowerSwitch::new` refuses those pins.
+- **Destructive actuations need confirmation.** A short press is what the case button does and needs none; `force-off`
+  and `reset` cut power under the OS's feet, so they require `--yes` on the CLI or `confirm=<verb>` on the API.
+- **Every pulse is bounded and released by a `Drop` guard**, there's a cooldown between actuations, and the service
+  drives every configured pin low at startup — so a crash mid-press is released within seconds rather than latched.
+
+Optionally wire the **power LED header** back through a second optocoupler (`POWER_LED_GPIO_PIN`). That's ground truth
+for "does this machine have power" in a way a network probe isn't: it tells "off" apart from "on but hung", and
+"booting" apart from "booted". Boards disagree about what the LED does in S3, so read it alongside the TCP probe rather
+than instead of it.
+
+Wiring, pin rules and what each hold duration means: [`crates/devices/README.md`](../crates/devices/README.md).
 
 ---
 
@@ -534,6 +554,14 @@ Each step is independently verifiable, so you always know which one broke.
 
 ---
 
+## See also
+
+[`using-the-remote-pc.md`](using-the-remote-pc.md) — the practical half: which screen tool for which task, controllers,
+every way to build a wake button (phone shortcut, Moonlight's own HTTP wake, ESP32, Zigbee, a real button on the Pi),
+latency tuning, and the things that will annoy you in week one.
+
+---
+
 ## Sources
 
 Wake-on-LAN and Windows power states:
@@ -569,3 +597,6 @@ Streaming:
 
 Hardware fallback:
 - [Remotely press a power button — Pi + optocoupler](https://medium.com/@larsborn/remotely-press-a-power-button-e03f30347536)
+- [Raspberry Pi forums — default GPIO pull state at boot](https://forums.raspberrypi.com/viewtopic.php?t=123427)
+- [rppal — `OutputPin` and reset-on-drop](https://docs.rs/rppal/latest/rppal/gpio/struct.OutputPin.html)
+- [Microsoft — power management setting on a network adapter (PnPCapabilities)](https://support.microsoft.com/help/2740020)
