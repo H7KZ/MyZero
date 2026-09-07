@@ -1,0 +1,22 @@
+[Unit]
+Description=MyZero pcctl (remote PC power control API)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/home/pi
+ExecStart=/home/pi/pcctl serve
+Restart=always
+RestartSec=5
+User=pi
+# Reads ~/.ssh/id_pcctl to reach the PC, so $HOME stays visible; everything
+# else it touches is read-only.
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

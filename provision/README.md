@@ -37,6 +37,7 @@ sudo bash ~/provision/scripts/install.sh
 | `HEADLESS`         | `no`              | `yes` = disable HDMI, free ~224 MB RAM               |
 | `OVERCLOCK`        | `none`            | `none` / `safe` (1.2 GHz) / `power` (700 MHz)        |
 | `INSTALL_CLAPPER`  | `no`              | `yes` = install the clapper binary + systemd service |
+| `INSTALL_PCCTL`    | `no`              | `yes` = install pcctl + its SSH key + control API     |
 
 ---
 
@@ -65,8 +66,14 @@ provision/
 │   ├── nm-global.conf       NM global settings template
 │   ├── hostapd.conf         hostapd template
 │   └── dnsmasq-hotspot.conf dnsmasq template
+├── pc/                      ← runs on the *PC*, not the Pi
+│   └── windows/
+│       ├── Setup-RemotePower.ps1  arms WoL + installs the SSH power hook
+│       └── pcpower.ps1            sleep/hibernate/shutdown dispatcher
 └── systemd/
-    └── pizero-hotspot.service  → /etc/systemd/system/
+    ├── pizero-hotspot.service  → /etc/systemd/system/
+    ├── clapper.service         → /etc/systemd/system/
+    └── pcctl.service           → /etc/systemd/system/
 ```
 
 ---
