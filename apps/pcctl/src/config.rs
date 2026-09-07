@@ -83,6 +83,26 @@ pub const SHUTDOWN_COMMAND: &str = env!("SHUTDOWN_COMMAND");
 /// Seconds before a power-down command is killed.
 pub const COMMAND_TIMEOUT_SECS: u64 = parse_u64(env!("COMMAND_TIMEOUT_SECS"));
 
+// ── Hardware fallback: the front-panel switch ─────────────────────────────
+/// BCM pin wired to PWR_SW through an optocoupler. `None` = not wired.
+pub const POWER_SW_GPIO_PIN: Option<u8> = optional_pin(env!("POWER_SW_GPIO_PIN"));
+/// BCM pin wired to RESET_SW. `None` = not wired.
+pub const RESET_SW_GPIO_PIN: Option<u8> = optional_pin(env!("RESET_SW_GPIO_PIN"));
+/// BCM pin reading the front-panel power LED. `None` = not wired.
+pub const POWER_LED_GPIO_PIN: Option<u8> = optional_pin(env!("POWER_LED_GPIO_PIN"));
+/// True if the LED wiring pulls the line low while lit.
+#[cfg_attr(not(feature = "gpio"), allow(dead_code))]
+pub const POWER_LED_INVERT: bool = is_true(env!("POWER_LED_INVERT"));
+/// Short press — the ACPI power event (on, or graceful shutdown).
+pub const PRESS_MS: u64 = parse_u64(env!("PRESS_MS"));
+/// Long press — the hard cut. Requires explicit confirmation.
+pub const FORCE_OFF_MS: u64 = parse_u64(env!("FORCE_OFF_MS"));
+/// Reset pulse length.
+#[cfg_attr(not(feature = "gpio"), allow(dead_code))]
+pub const RESET_MS: u64 = parse_u64(env!("RESET_MS"));
+/// Minimum gap between actuations.
+pub const PRESS_COOLDOWN_SECS: u64 = parse_u64(env!("PRESS_COOLDOWN_SECS"));
+
 // ── HTTP control API ──────────────────────────────────────────────────────
 /// `ip:port` the `serve` subcommand binds.
 pub const LISTEN_ADDR: &str = env!("LISTEN_ADDR");
@@ -90,6 +110,21 @@ pub const LISTEN_ADDR: &str = env!("LISTEN_ADDR");
 pub const API_TOKEN: &str = env!("API_TOKEN");
 /// Seconds `--wait` polls for the PC to answer on `PC_PROBE_PORT`.
 pub const WAKE_TIMEOUT_SECS: u64 = parse_u64(env!("WAKE_TIMEOUT_SECS"));
+
+/// `0` means "not wired" for every pin in this config, matching clapper.
+const fn optional_pin(raw: &str) -> Option<u8> {
+    let v = parse_u16(raw);
+    if v == 0 {
+        None
+    } else {
+        Some(v as u8)
+    }
+}
+
+#[cfg_attr(not(feature = "gpio"), allow(dead_code))]
+const fn is_true(raw: &str) -> bool {
+    matches!(raw.as_bytes(), b"true" | b"1" | b"yes")
+}
 
 /// Splits a comma-separated config value, dropping blanks.
 fn split_list(raw: &'static str) -> Vec<&'static str> {

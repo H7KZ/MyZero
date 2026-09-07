@@ -7,7 +7,15 @@ edition = "2021"
 name = "pcctl"
 path = "src/main.rs"
 
+[features]
+# On by default so the Pi build gets the hardware fallback with no extra flags.
+# Turn it off (`--no-default-features`) to build/test on a non-Linux host: rppal
+# is Linux-only, and everything except press/force-off/reset is pure std.
+default = ["gpio"]
+gpio = ["dep:devices"]
+
 [dependencies]
-# Shared workspace crates. No third-party deps: pcctl is pure std so it
-# cross-compiles to the Pi with nothing but a linker.
-net = { path = "../../crates/net" } # wake-on-lan + TCP liveness probe
+# Shared workspace crates. Apart from the optional GPIO driver, pcctl is pure
+# std, so it cross-compiles to the Pi with nothing but a linker.
+net = { path = "../../crates/net" }                          # wake-on-lan + TCP liveness probe
+devices = { path = "../../crates/devices", optional = true } # front-panel switch + power LED

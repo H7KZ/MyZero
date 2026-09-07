@@ -17,28 +17,53 @@ pcctl wake              # send the magic packet
 pcctl wake --wait       # …and block until the PC answers (or WAKE_TIMEOUT_SECS)
 pcctl sleep             # run SLEEP_COMMAND on the PC (SSH, forced command)
 pcctl shutdown          # run SHUTDOWN_COMMAND on the PC
+pcctl press             # tap the front-panel power switch through the GPIO
+pcctl force-off --yes   # hold it past the ATX cut-off — loses unsaved work
+pcctl reset --yes       # pulse the front-panel reset switch
 pcctl serve             # HTTP control API on LISTEN_ADDR
 pcctl config            # print the baked-in configuration
 ```
 
 Exit status is 0 on success, 1 on failure — usable straight from a shell script or a cron job.
 
+Only one power operation runs at a time, process-wide. Two clients pressing *sleep* and *wake* in the same second would
+otherwise race and leave the PC in a state neither of them asked for; the loser gets a clear "already running" instead.
+
+### The hardware verbs
+
+`press` / `force-off` / `reset` close a contact across the motherboard's front-panel header through an optocoupler —
+the escape hatch for when Wake-on-LAN can't help at all. They need `POWER_SW_GPIO_PIN` (and/or `RESET_SW_GPIO_PIN`)
+wired and set, on a **BCM pin between 9 and 27**: pins 0–8 boot with a pull-up that would hold the button down for the
+first ~20 s after the Pi powers on, so `pcctl` refuses them. Wiring and the rest of the safety rules are in
+[`devices`](../../crates/devices/README.md#the-front-panel-switch--read-this-before-wiring-it).
+
+A short `press` is the ACPI power event — the case button — so it needs no confirmation. `force-off` and `reset` cut
+power under the OS and require `--yes` (CLI) or `confirm=<verb>` (API).
+
 ## HTTP API
 
 ```
-GET  /                    control page (phone-sized; token comes from ?token=)
-GET  /status              {"ok":true,"message":"up — …","up":true,…}
-GET  /wake[?wait=1]       also POST — GET so Moonlight's HTTP-wake can call it
+GET  /                       control page (phone-sized; token comes from ?token=)
+GET  /status                 {"ok":true,"message":"up — …","up":true,"led":null,…}
+GET  /wake[?wait=1]          also POST — GET so Moonlight's HTTP-wake can call it
 POST /sleep
 POST /shutdown
+POST /press                  tap the front-panel power switch
+POST /force-off?confirm=force-off
+POST /reset?confirm=reset
 ```
+
+`up` is the TCP probe, `led` the front-panel power LED if one is wired (`null` = not wired). The two disagreeing is
+informative rather than contradictory — lit but not answering is "booting, or hung".
 
 Auth is `Authorization: Bearer <API_TOKEN>` or `?token=<API_TOKEN>`. `/sleep` and `/shutdown` are POST-only on
 purpose — a GET that changes power state is one browser prefetch away from an accidental shutdown. `/wake` is
 idempotent, so it gets both.
 
 **`serve` refuses to bind anything but loopback without a token.** An open wake endpoint is a remote power switch for
-whoever finds it.
+whoever finds it. There are no cookies anywhere, so there is no ambient authority for another tab to borrow — the token
+must be presented explicitly on every request. Connection threads are capped, so a client that opens sockets and never
+speaks can't walk the Pi into swap.
 
 ```sh
 curl -H "Authorization: Bearer $TOKEN" http://100.x.y.z:8080/status
@@ -92,6 +117,10 @@ provisioner. That step also generates `~/.ssh/id_pcctl` on the Pi and prints the
 | `WOL_BIND`                                 | Local IP to send from; pins the interface if the Pi is multi-homed.  |
 | `SLEEP_COMMAND` / `SHUTDOWN_COMMAND`       | Shell lines. Empty disables the verb.                                |
 | `COMMAND_TIMEOUT_SECS`                     | The command is killed after this.                                    |
+| `POWER_SW_GPIO_PIN` / `RESET_SW_GPIO_PIN`  | Front-panel switch pins. `0` = not wired. **Must be 9–27.**          |
+| `POWER_LED_GPIO_PIN` / `POWER_LED_INVERT`  | Read the PC's power LED back. `0` = not wired.                       |
+| `PRESS_MS` / `FORCE_OFF_MS` / `RESET_MS`   | Pulse lengths. ~250 ms taps; ~6 s is the ATX hard cut.               |
+| `PRESS_COOLDOWN_SECS`                      | Minimum gap between actuations, so nothing can power-cycle in a loop.|
 | `LISTEN_ADDR`                              | `serve` bind address. Prefer the Pi's tailnet IP over `0.0.0.0`.     |
 | `API_TOKEN`                                | `openssl rand -hex 32`. Required for any non-loopback bind.          |
 | `WAKE_TIMEOUT_SECS`                        | How long `--wait` polls. S3 wakes in seconds; S5 can take a minute.  |
@@ -101,8 +130,14 @@ fresh clone still builds, with a `cargo:warning` telling you it did.
 
 ## Notes
 
-- Pure std, no third-party crates: it cross-compiles to the Zero 2 with nothing but a linker, and the HTTP server is
-  ~200 lines of `TcpListener` and threads.
+- Pure std apart from the optional GPIO driver, so it cross-compiles to the Zero 2 with nothing but a linker, and the
+  HTTP server is a couple of hundred lines of `TcpListener` and threads.
+- The front-panel switch lives behind the default-on **`gpio` feature**. Build with `--no-default-features` on a
+  Windows/macOS host — `rppal` is Linux-only — and the hardware verbs compile to a clear "not built in" message while
+  everything else works unchanged.
 - Magic packets and the TCP probe live in the shared [`net`](../../crates/net/README.md) crate, which is unit-tested on
   any host (`cargo test -p net`).
-- No GPIO, so `pcctl` builds and runs on your laptop too — handy for testing before it ever reaches the Pi.
+- Without the `gpio` feature there's no hardware dependency at all, so `pcctl` builds and runs on your laptop — handy
+  for testing before it ever reaches the Pi.
+- How to actually drive all this day to day — phone shortcuts, Moonlight, RDP, physical buttons — is in
+  [`docs/using-the-remote-pc.md`](../../docs/using-the-remote-pc.md).
