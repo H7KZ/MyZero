@@ -1,0 +1,13 @@
+[package]
+name = "pcctl"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "pcctl"
+path = "src/main.rs"
+
+[dependencies]
+# Shared workspace crates. No third-party deps: pcctl is pure std so it
+# cross-compiles to the Pi with nothing but a linker.
+net = { path = "../../crates/net" } # wake-on-lan + TCP liveness probe
