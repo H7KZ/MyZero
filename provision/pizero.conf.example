@@ -62,6 +62,16 @@ HEADLESS="no"
 #   cp target/aarch64-unknown-linux-gnu/release/clapper provision/bin/
 INSTALL_CLAPPER="no"
 
+# ── pcctl (remote PC power control) ───────────────────────────
+# Set to "yes" to install the pcctl binary, generate the Pi's SSH
+# key for the PC, and run the HTTP control API as a service.
+# Before running install.sh, cross-compile the binary:
+#   make build
+#   cp target/aarch64-unknown-linux-gnu/release/pcctl provision/bin/
+# Then run provision/pc/windows/Setup-RemotePower.ps1 on the PC with
+# the public key install.sh prints.
+INSTALL_PCCTL="no"
+
 # ── Performance ───────────────────────────────────────────────
 # Overclock preset:
 #   none   = stock 1000 MHz, no changes

@@ -911,8 +911,61 @@ step_clapper() {
 }
 
 # ─────────────────────────────────────────────────────────────
+step_pcctl() {
+    [[ "${INSTALL_PCCTL:-no}" != "yes" ]] && return 0
+    section "STEP 11: PCCTL (remote PC power control)"
+    dry "install pcctl" || return 0
+
+    local bin_src="${PKG_DIR}/bin/pcctl"
+    local bin_dst="/home/${REAL_USER}/pcctl"
+
+    # ── Binary ───────────────────────────────────────────────────
+    if [[ ! -f "$bin_src" ]]; then
+        log_warn "pcctl binary not found at ${bin_src}"
+        log_warn "Cross-compile it first:  make build  (on your dev machine)"
+        log_warn "Then copy to:            provision/bin/pcctl"
+    else
+        cp -f "$bin_src" "$bin_dst"
+        chmod 755 "$bin_dst"
+        chown "${REAL_USER}:${REAL_USER}" "$bin_dst"
+        log_ok "Binary deployed: ${bin_dst}"
+    fi
+
+    # ── SSH key for the power-down commands ──────────────────────
+    # Generated here rather than shipped, so the private half never leaves the
+    # Pi. Its public half goes to the PC's Setup-RemotePower.ps1.
+    local key="/home/${REAL_USER}/.ssh/id_pcctl"
+    if [[ ! -f "$key" ]]; then
+        sudo -u "${REAL_USER}" mkdir -p "/home/${REAL_USER}/.ssh"
+        sudo -u "${REAL_USER}" ssh-keygen -t ed25519 -N "" -C "pcctl@${PI_HOSTNAME}" -f "$key" >/dev/null
+        log_ok "Generated ${key}"
+    else
+        log_skip "SSH key already present: ${key}"
+    fi
+    log_info "Public key for the PC's Setup-RemotePower.ps1 -PublicKey:"
+    echo ""
+    cat "${key}.pub"
+    echo ""
+
+    # ── systemd service ──────────────────────────────────────────
+    cp -f "${PKG_DIR}/systemd/pcctl.service" \
+          /etc/systemd/system/pcctl.service
+    systemctl daemon-reload
+    systemctl enable pcctl.service
+    log_ok "pcctl.service: enabled"
+
+    if [[ -f "$bin_dst" ]]; then
+        systemctl restart pcctl.service 2>/dev/null || true
+        log_ok "pcctl.service: started"
+    else
+        log_warn "Service enabled but not started — deploy binary first, then:"
+        log_warn "  sudo systemctl start pcctl"
+    fi
+}
+
+# ─────────────────────────────────────────────────────────────
 step_cleanup() {
-    section "STEP 11: CLEANUP"
+    section "STEP 12: CLEANUP"
     dry "cleanup" || return 0
 
     local before
@@ -1052,6 +1105,7 @@ main() {
     step_tools
     step_hotspot
     step_clapper
+    step_pcctl
     step_cleanup
     step_health
 
