@@ -168,7 +168,7 @@ try {
 }
 
 # =================================================================
-# Stage 4: stage binaries, then copy provision/ via tar-over-ssh
+# Stage 4: stage binaries, then copy provision/ (tar + scp)
 # =================================================================
 Write-Step "Stage 4/6: Stage binaries and copy provision/"
 try {
@@ -202,15 +202,21 @@ try {
         Fail "tar.exe not found. Windows 11 ships it; check your PATH."
     }
 
-    # tar-over-ssh: fastest transfer without rsync. Extracts to a staging
-    # dir on the Pi, then atomically swaps it into place.
-    $remoteCopyCmd = "rm -rf ~/provision.new && mkdir -p ~/provision.new && tar -xf - -C ~/provision.new && rm -rf ~/provision && mv ~/provision.new ~/provision"
-    Push-Location $ProvisionDir
+    # Archive to a temp file, scp it, extract remotely. Not a tar | ssh
+    # pipe: Windows PowerShell 5.1 pipes native output as text and corrupts
+    # the binary stream ("tar: Skipping to next header"). Extracts to a
+    # staging dir on the Pi, then swaps it into place.
+    $archive = Join-Path $env:TEMP "pizero-provision.tar"
     try {
-        & tar -cf - -C $ProvisionDir . | & ssh -i $KeyPath $Target $remoteCopyCmd
-        if ($LASTEXITCODE -ne 0) { Fail "Copy to Pi failed (exit $LASTEXITCODE)" }
+        & tar -cf $archive -C $ProvisionDir .
+        if ($LASTEXITCODE -ne 0) { Fail "tar failed (exit $LASTEXITCODE)" }
+        & scp -q -i $KeyPath $archive "${Target}:~/pizero-provision.tar"
+        if ($LASTEXITCODE -ne 0) { Fail "scp to Pi failed (exit $LASTEXITCODE)" }
+        $remoteCopyCmd = "rm -rf ~/provision.new && mkdir -p ~/provision.new && tar -xf ~/pizero-provision.tar -C ~/provision.new && rm -f ~/pizero-provision.tar && rm -rf ~/provision && mv ~/provision.new ~/provision"
+        & ssh -i $KeyPath $Target $remoteCopyCmd
+        if ($LASTEXITCODE -ne 0) { Fail "Extract on Pi failed (exit $LASTEXITCODE)" }
     } finally {
-        Pop-Location
+        Remove-Item $archive -ErrorAction SilentlyContinue
     }
     Write-Ok "provision/ copied to ~/provision on the Pi"
 } catch {
