@@ -175,7 +175,7 @@ If `raspberrypi.local` doesn't resolve, set `PI_HOST` in `Makefile` to the Pi's 
 SSH key setup (avoids password prompts):
 
 ```sh
-ssh-copy-id pi@raspberrypi.local
+ssh-copy-id zero@raspberrypi.local
 ```
 
 ## Makefile targets
@@ -201,11 +201,11 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/home/pi/departure-board
-WorkingDirectory=/home/pi
+ExecStart=/home/zero/departure-board
+WorkingDirectory=/home/zero
 Restart=on-failure
 RestartSec=5
-User=pi
+User=zero
 
 [Install]
 WantedBy=multi-user.target

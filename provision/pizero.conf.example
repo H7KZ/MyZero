@@ -45,8 +45,22 @@ TIMEZONE="Europe/Prague"
 
 # ── SSH ───────────────────────────────────────────────────────
 # Paste the full line from ~/.ssh/id_ed25519.pub or id_rsa.pub
-# Leave empty string ("") to skip — password auth still works
+# Leave empty string ("") to skip — password auth still works.
+# If you're using provision/bootstrap.ps1, leave this empty — it installs
+# its own generated key over SSH instead.
 SSH_PUBLIC_KEY=""
+
+# Disable SSH password authentication once a key is on file. Only takes
+# effect if authorized_keys is actually non-empty (never locks you out).
+# bootstrap.ps1 sets this via SSH_HARDEN=1 automatically unless -NoHarden.
+SSH_DISABLE_PASSWORD="no"
+
+# Minutes install.sh waits before auto-reverting an unconfirmed WiFi/SSH
+# config change (see "Rollback safety net" in README.md).
+ROLLBACK_MINUTES="10"
+
+# How many old provision run backups (in ~/pizero-backups/) to keep.
+BACKUP_KEEP="5"
 
 # ── Headless mode ─────────────────────────────────────────────
 # Set to "yes" ONLY if a monitor will NEVER be connected.
@@ -71,6 +85,11 @@ INSTALL_CLAPPER="no"
 # Then run provision/pc/windows/Setup-RemotePower.ps1 on the PC with
 # the public key install.sh prints.
 INSTALL_PCCTL="no"
+
+# ── Fallback Hotspot toggle ────────────────────────────────────
+# Set to "no" to skip installing the fallback hotspot entirely
+# (hostapd/dnsmasq/watchdog). Default "yes" preserves prior behavior.
+INSTALL_HOTSPOT="yes"
 
 # ── Performance ───────────────────────────────────────────────
 # Overclock preset:

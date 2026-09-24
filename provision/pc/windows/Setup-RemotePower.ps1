@@ -335,8 +335,8 @@ function Show-Report {
     Write-Host "PC_HOST=$ip"
     Write-Host 'PC_PROBE_PORT=22'
     Write-Host "WOL_BROADCASTS=$prefix.255,255.255.255.255"
-    Write-Host "SLEEP_COMMAND=ssh -i /home/pi/.ssh/id_pcctl -o BatchMode=yes -o ConnectTimeout=5 $User@$ip sleep"
-    Write-Host "SHUTDOWN_COMMAND=ssh -i /home/pi/.ssh/id_pcctl -o BatchMode=yes -o ConnectTimeout=5 $User@$ip shutdown"
+    Write-Host "SLEEP_COMMAND=ssh -i /home/zero/.ssh/id_pcctl -o BatchMode=yes -o ConnectTimeout=5 $User@$ip sleep"
+    Write-Host "SHUTDOWN_COMMAND=ssh -i /home/zero/.ssh/id_pcctl -o BatchMode=yes -o ConnectTimeout=5 $User@$ip shutdown"
     Write-Host ''
     Log-Info "Give the PC a DHCP reservation so PC_HOST stays $ip."
 }

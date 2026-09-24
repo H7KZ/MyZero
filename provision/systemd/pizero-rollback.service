@@ -1,0 +1,7 @@
+[Unit]
+Description=Roll back pizero network/SSH config if never confirmed
+Documentation=file:///etc/pizero/README.md
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/pizero/pizero-rollback.sh

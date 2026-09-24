@@ -98,6 +98,28 @@ load_config() {
     HEADLESS="${HEADLESS:-no}"
     OVERCLOCK="${OVERCLOCK:-none}"
     SSH_PUBLIC_KEY="${SSH_PUBLIC_KEY:-}"
+    SSH_DISABLE_PASSWORD="${SSH_DISABLE_PASSWORD:-no}"
+    ROLLBACK_MINUTES="${ROLLBACK_MINUTES:-10}"
+    BACKUP_KEEP="${BACKUP_KEEP:-5}"
+    INSTALL_HOTSPOT="${INSTALL_HOTSPOT:-yes}"
+}
+
+# ── Backup pruning ────────────────────────────────────────────
+# Keeps only the newest N backup directories under
+# ${REAL_HOME}/pizero-backups/, deleting older ones.
+prune_backups() {
+    local root="$1" keep="${2:-5}"
+    [[ -d "$root" ]] || return 0
+    local -a dirs=()
+    while IFS= read -r d; do dirs+=("$d"); done < <(
+        find "$root" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null \
+            | sort -rn | cut -d' ' -f2-
+    )
+    local i
+    for (( i = keep; i < ${#dirs[@]}; i++ )); do
+        rm -rf -- "${dirs[$i]}"
+        log_ok "Pruned old backup: $(basename "${dirs[$i]}")"
+    done
 }
 
 # ── APT install helper ────────────────────────────────────────
@@ -109,7 +131,7 @@ apt_ensure() {
     done
     if [[ ${#missing[@]} -gt 0 ]]; then
         log_action "Installing: ${missing[*]}"
-        DEBIAN_FRONTEND=noninteractive apt-get install -y "${missing[@]}" 2>&1 \
+        DEBIAN_FRONTEND=noninteractive apt-get ${APT_OPTS[@]+"${APT_OPTS[@]}"} install -y "${missing[@]}" 2>&1 \
             | grep -v "^The following packages" \
             | grep -v "^Use 'sudo apt" \
             | grep -v "were automatically installed" \

@@ -1,9 +1,14 @@
-PI_HOST = pi@raspberrypi.local
+PI_HOST = zero@raspberrypi.local
 TARGET  = aarch64-unknown-linux-gnu
 # Which app to build/deploy/run. Override: make deploy BIN=clapper
 BIN    ?= departure-board
 
-.PHONY: build build-all deploy ship check logs status env new-env run
+.PHONY: build build-all deploy ship check logs status env new-env run bootstrap
+
+# Provisions a fresh Pi from Windows: SSH key setup, copy provision/, run
+# install.sh, offer reboot. Extra args: e.g. `make bootstrap ARGS="-DryRun"`.
+bootstrap:
+	powershell -ExecutionPolicy Bypass -File provision/bootstrap.ps1 $(ARGS)
 
 # Cross-compiles just $(BIN) for the Pi.
 build:

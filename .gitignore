@@ -3,3 +3,4 @@
 /provision/pizero.conf
 /provision/bin/*
 !/provision/bin/.gitkeep
+/.keys/

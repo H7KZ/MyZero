@@ -5,14 +5,14 @@ Wants=network-online.target
 
 [Service]
 # Config is read at startup from ENV_FILE — a named path rather than the
-# default ./.env, since clapper and pcctl share /home/pi. Deploy it there
+# default ./.env, since clapper and pcctl share %%HOME%%. Deploy it there
 # before starting the service.
-WorkingDirectory=/home/pi
-Environment=ENV_FILE=/home/pi/clapper.env
-ExecStart=/home/pi/clapper
+WorkingDirectory=%%HOME%%
+Environment=ENV_FILE=%%HOME%%/clapper.env
+ExecStart=%%HOME%%/clapper
 Restart=on-failure
 RestartSec=5
-User=pi
+User=%%USER%%
 # GPIO access for the sound sensor / LED (via /dev/gpiomem).
 SupplementaryGroups=gpio
 

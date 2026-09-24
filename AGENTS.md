@@ -39,8 +39,11 @@ cargo check -p pcctl -p net -p appconfig --no-default-features
 
 Every app reads config **at runtime**, not compile time (`crates/config`). Lookup order: process env > `.env`
 file, and the file is found via `--config <path>` → `ENV_FILE` env var → `.env` next to the binary → `.env` in the
-CWD. systemd units set `ENV_FILE=/home/pi/<app>.env`; `install.sh` deploys `provision/bin/<app>.env` there. Never
+CWD. systemd units set `ENV_FILE=/home/zero/<app>.env`; `install.sh` deploys `provision/bin/<app>.env` there. Never
 edit an app's key list in more than one place — it lives in that app's `.env.example` / README, nowhere else.
+
+Provisioning a Pi from Windows: `powershell -ExecutionPolicy Bypass -File provision/bootstrap.ps1` (SSH key setup,
+copy, `install.sh` run, rollback-confirm) — see [provision/README.md](provision/README.md).
 
 ## Invariants and gotchas
 

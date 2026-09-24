@@ -99,7 +99,7 @@ It prints the MAC and the exact `.env` lines to paste. See [that folder's README
 ```sh
 cp .env.example .env      # set PC_MAC, PC_HOST, WOL_BROADCASTS, API_TOKEN …
 make ship BIN=pcctl       # from repo root
-make run  BIN=pcctl       # or: ssh pi@… ./pcctl wake --wait
+make run  BIN=pcctl       # or: ssh zero@… ./pcctl wake --wait
 ```
 
 **3. Autostart** — `provision/systemd/pcctl.service`, or set `INSTALL_PCCTL="yes"` in `pizero.conf` and re-run the

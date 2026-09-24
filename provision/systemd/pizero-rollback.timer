@@ -1,0 +1,15 @@
+[Unit]
+Description=Fire pizero-rollback.service if not confirmed in time
+
+[Timer]
+# Covers both paths: changes applied without a reboot (OnActiveSec, counts
+# from when this timer is started) and changes applied right before a
+# reboot (OnBootSec, counts from the next boot — this is why a persistent
+# timer unit is used instead of `systemd-run --on-active`, which does not
+# survive a reboot).
+OnActiveSec=%%ROLLBACK_MINUTES%%min
+OnBootSec=%%ROLLBACK_MINUTES%%min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

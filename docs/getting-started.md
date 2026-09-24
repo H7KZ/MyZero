@@ -19,15 +19,19 @@ Goal: Wi-Fi with fallback hotspot, hostname, timezone, SSH key, headless/overclo
 
 ```sh
 cp provision/pizero.conf.example provision/pizero.conf
-notepad provision/pizero.conf   # fill WIFI_SSID, WIFI_PASSWORD, SSH_PUBLIC_KEY, etc.
-scp -r provision/ pi@<pi-ip-or-hostname>:~/
-ssh pi@<pi-ip-or-hostname> "sudo bash ~/provision/scripts/install.sh"
+notepad provision/pizero.conf   # fill WIFI_SSID, WIFI_PASSWORD, etc.
+powershell -ExecutionPolicy Bypass -File provision/bootstrap.ps1
 ```
 
-Reboot when prompted. Full option reference: [provision/README.md](../provision/README.md).
+`bootstrap.ps1` (PowerShell, run on Windows — see [provision/README.md](../provision/README.md) for flags like
+`-TargetHost`, `-Bin`, `-NoHarden`, `-DryRun`) generates an SSH key under `.keys/` if needed, installs it on the
+Pi with one password prompt, copies `provision/` over via `tar`, and runs `install.sh` on the Pi over SSH. It
+prints next steps and offers to reboot. install.sh arms a rollback timer before touching WiFi/SSH config — if the
+new config doesn't work, the Pi reverts itself automatically after `ROLLBACK_MINUTES` (default 10); confirm a
+working install with `sudo pizero-confirm`, which `bootstrap.ps1` also runs for you after it reconnects post-reboot.
 
-**Check it worked:** `ssh pi@<PI_HOSTNAME>.local` succeeds after reboot; `nmcli device status` shows `wlan0`
-connected.
+**Check it worked:** `ssh -i .keys/id_ed25519_pizero zero@<PI_HOSTNAME>.local` succeeds after reboot; `nmcli device
+status` shows `wlan0` connected.
 
 ## 3. Set up the build toolchain (on your dev machine)
 
@@ -64,8 +68,8 @@ notepad provision/bin/clapper.env
 notepad provision/bin/pcctl.env
 ```
 
-`install.sh` deploys these to `/home/pi/<app>.env` on the Pi, and each app's systemd unit sets
-`Environment=ENV_FILE=/home/pi/<app>.env` so the binary finds it regardless of working directory.
+`install.sh` deploys these to `/home/zero/<app>.env` on the Pi, and each app's systemd unit sets
+`Environment=ENV_FILE=/home/zero/<app>.env` so the binary finds it regardless of working directory.
 
 Already provisioned Pi? Skip `install.sh` and use the Makefile instead:
 
@@ -95,7 +99,7 @@ restart step fails harmlessly after the copy — run it with `make run BIN=depar
 No local toolchain? Run the **Build** workflow manually on GitHub (Actions → Build → Run workflow, pick the app) and
 download the binary from the run's artifacts.
 
-**Check it worked:** `ssh pi@<pi> "ls ~/<binary-name>"` shows the file.
+**Check it worked:** `ssh zero@<pi> "ls ~/<binary-name>"` shows the file.
 
 ## 7. Enable systemd autostart
 
@@ -105,7 +109,7 @@ For `clapper`/`pcctl`, set `INSTALL_CLAPPER=yes` / `INSTALL_PCCTL=yes` in `provi
 running `install.sh` (step 2), after building the binary and placing it at `provision/bin/<app>` (per the comments
 in `pizero.conf.example`). Re-run `install.sh` to apply.
 
-**Check it worked:** `ssh pi@<pi> "systemctl status clapper"` (or `pcctl`) shows `active (running)`.
+**Check it worked:** `ssh zero@<pi> "systemctl status clapper"` (or `pcctl`) shows `active (running)`.
 
 ---
 
@@ -142,4 +146,4 @@ This is the shallow version — BIOS WoL settings, router config, Tailscale, and
 covered end to end in **[docs/remote-pc-setup.md](remote-pc-setup.md)**; day-to-day use in
 [docs/remote-pc-usage.md](remote-pc-usage.md).
 
-**Check it worked:** `ssh pi@<pi> "pcctl wake"` (or the HTTP API) brings the PC out of sleep.
+**Check it worked:** `ssh zero@<pi> "pcctl wake"` (or the HTTP API) brings the PC out of sleep.

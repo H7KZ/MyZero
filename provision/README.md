@@ -1,20 +1,40 @@
 # Pi Zero 2 WH Setup Package
 
-## Quick Start — 3 steps
+## Quick Start
+
+From a Windows dev machine (OpenSSH client only, no rsync/sshpass needed):
+
+```powershell
+# 1. Create your config from the template, then edit it.
+#    pizero.conf is gitignored (holds WiFi password) — never commit it.
+copy provision\pizero.conf.example provision\pizero.conf
+notepad provision\pizero.conf
+
+# 2. Run the bootstrap script — generates/installs an SSH key (one password
+#    prompt), copies provision/ over, runs install.sh on the Pi, offers to reboot.
+powershell -ExecutionPolicy Bypass -File provision\bootstrap.ps1
+```
+
+`bootstrap.ps1` params: `-TargetHost` (default `<PI_HOSTNAME from pizero.conf>.local` or `raspberrypi.local`),
+`-User` (default `zero`), `-Bin <name>...` (stage built binaries + their `.env` before installing), `-NoHarden`
+(skip disabling SSH password auth), `-DryRun` (passes `--dry-run` to `install.sh`).
+
+Manual path (Linux/macOS, or if you'd rather drive it yourself):
 
 ```bash
-# 1. Create your config from the template, then edit it.
-#    pizero.conf is gitignored (holds WiFi password + SSH key) — never commit it.
-cp provision/pizero.conf.example provision/pizero.conf
-nano provision/pizero.conf
-
-# 2. Copy the package to your Pi (from your laptop/desktop)
-scp -r provision/ pi@192.168.x.x:~/
-
-# 3. Run the installer on the Pi
-sudo bash ~/provision/scripts/install.sh
+scp -r provision/ zero@192.168.x.x:~/
+ssh zero@192.168.x.x "sudo bash ~/provision/scripts/install.sh"
 # → reboot when prompted
 ```
+
+### Rollback safety net
+
+Before touching WiFi or SSH config, `install.sh` snapshots the current state and arms a persistent systemd timer
+(`pizero-rollback.timer`, survives reboot). If nobody runs `sudo pizero-confirm` within `ROLLBACK_MINUTES` (default
+10) of the change, the Pi automatically restores the snapshot and restarts NetworkManager/sshd (+ reboots if
+needed) — so a bad WiFi password or SSH lockout self-heals instead of bricking access. `bootstrap.ps1` runs
+`pizero-confirm` for you once it reconnects after a reboot; on a non-reboot run, `install.sh` confirms itself if it
+can verify connectivity before exiting.
 
 ---
 
@@ -38,6 +58,13 @@ sudo bash ~/provision/scripts/install.sh
 | `OVERCLOCK`        | `none`            | `none` / `safe` (1.2 GHz) / `power` (700 MHz)        |
 | `INSTALL_CLAPPER`  | `no`              | `yes` = install the clapper binary + systemd service |
 | `INSTALL_PCCTL`    | `no`              | `yes` = install pcctl + its SSH key + control API     |
+| `INSTALL_HOTSPOT`  | `yes`             | `no` = skip the fallback-hotspot install entirely     |
+| `SSH_DISABLE_PASSWORD` | `no`          | `yes` = disable SSH password auth (only if a key is already on file) |
+| `ROLLBACK_MINUTES` | `10`              | Minutes before an unconfirmed WiFi/SSH change auto-reverts |
+| `BACKUP_KEEP`      | `5`               | Number of old `pizero-backups/` snapshots to keep     |
+
+`install.sh` flags: `--dry-run` (no changes), `--no-reboot` (skip the reboot prompt), `--check` (preflight + config
+validation only, implies `--dry-run`), `--no-upgrade` (skip `apt dist-upgrade`, still installs required packages).
 
 ---
 
@@ -46,14 +73,17 @@ sudo bash ~/provision/scripts/install.sh
 ```
 provision/
 ├── pizero.conf.example      ← copy to pizero.conf, then edit
+├── bootstrap.ps1            ← run this on Windows (see Quick Start)
 ├── README.md
 ├── scripts/
-│   ├── install.sh           ← run this with sudo
+│   ├── install.sh           ← run this with sudo (bootstrap.ps1 does this for you)
 │   ├── lib.sh               ← shared functions (auto-sourced)
 │   ├── hotspot-start.sh     ← raises the fallback AP
 │   ├── hotspot-stop.sh      ← tears down the fallback AP
 │   ├── wifi-watchdog.sh     ← runs as systemd service at boot
-│   └── pizero-headless.sh   ← toggle headless mode on/off
+│   ├── pizero-headless.sh   ← toggle headless mode on/off
+│   ├── pizero-rollback.sh   ← reverts WiFi/SSH config if not confirmed
+│   └── pizero-confirm.sh    ← installed as `pizero-confirm`, disarms rollback
 ├── configs/
 │   ├── 99-pizero-sysctl.conf    → /etc/sysctl.d/
 │   ├── 60-pizero-ioscheduler.rules → /etc/udev/rules.d/
@@ -72,9 +102,14 @@ provision/
 │       └── pcpower.ps1            sleep/hibernate/shutdown dispatcher
 └── systemd/
     ├── pizero-hotspot.service  → /etc/systemd/system/
+    ├── pizero-rollback.service → /etc/systemd/system/
+    ├── pizero-rollback.timer   → /etc/systemd/system/ (persistent, survives reboot)
     ├── clapper.service         → /etc/systemd/system/
     └── pcctl.service           → /etc/systemd/system/
 ```
+
+`bootstrap.ps1` also creates `.keys/` at the repo root (gitignored) holding the SSH keypair it generates for the
+Pi. Keep that folder somewhere safe once provisioning is done, or delete it if you'd rather re-generate on demand.
 
 ---
 
@@ -111,8 +146,8 @@ and patches the hostapd config to match before starting. If `wlan0` is not conne
 1. Join `PiZero-Fallback` (password: `raspberry`)
 2. SSH in:
    ```bash
-   ssh pi@10.42.0.1           # always works
-   ssh pi@raspberry.local     # works on macOS/Linux with Bonjour
+   ssh zero@10.42.0.1           # always works
+   ssh zero@raspberry.local     # works on macOS/Linux with Bonjour
    ```
 
 **Manual control:**

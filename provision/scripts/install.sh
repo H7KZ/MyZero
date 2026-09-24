@@ -31,18 +31,33 @@ REAL_USER="${SUDO_USER:-$(whoami)}"
 REAL_HOME="$(eval echo "~${REAL_USER}")"
 BACKUP_DIR="${REAL_HOME}/pizero-backups/$(date +%Y%m%d-%H%M%S)"
 
+# Shared apt options: no interactive pty spam, keep the fast path.
+APT_OPTS=( -o Dpkg::Use-Pty=0 )
+
 FLAG_DRY_RUN=false
 FLAG_NO_REBOOT=false
+FLAG_CHECK=false
+FLAG_NO_UPGRADE=false
 REBOOT_REQUIRED=false
+
+# SSH_HARDEN=1 in the environment (set by bootstrap.ps1 after it has
+# confirmed key login works) OR SSH_DISABLE_PASSWORD=yes in pizero.conf
+# gate disabling password auth. Both are re-checked in step_system
+# against a non-empty authorized_keys before anything is disabled.
+SSH_HARDEN="${SSH_HARDEN:-0}"
 
 # ── Argument parsing ──────────────────────────────────────────
 for arg in "$@"; do
     case "$arg" in
         --dry-run)    FLAG_DRY_RUN=true ;;
         --no-reboot)  FLAG_NO_REBOOT=true ;;
+        --check)      FLAG_CHECK=true; FLAG_DRY_RUN=true ;;
+        --no-upgrade) FLAG_NO_UPGRADE=true ;;
         --help|-h)
-            echo "Usage: sudo bash scripts/install.sh [--dry-run] [--no-reboot]"
+            echo "Usage: sudo bash scripts/install.sh [--dry-run] [--no-reboot] [--check] [--no-upgrade]"
             echo "Edit pizero.conf first, then run this script."
+            echo "  --check       preflight + config validation only, no changes (implies --dry-run)"
+            echo "  --no-upgrade  skip apt dist-upgrade (still installs required packages)"
             exit 0 ;;
         *)  echo "Unknown option: $arg — use --help" >&2; exit 1 ;;
     esac
@@ -164,6 +179,8 @@ step_backup() {
 
     chown -R "${REAL_USER}:${REAL_USER}" "${REAL_HOME}/pizero-backups/" 2>/dev/null || true
     log_info "Backup location: ${BACKUP_DIR}"
+
+    prune_backups "${REAL_HOME}/pizero-backups" "${BACKUP_KEEP}"
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -171,18 +188,31 @@ step_update() {
     section "STEP 1: SYSTEM UPDATE"
     dry "system update" || return 0
 
-    log_action "Updating package index..."
-    apt-get update -y 2>&1 | tail -3
-    log_ok "Package index updated"
+    # Skip apt-get update if the package lists are fresh (< 6h old) —
+    # saves ~10-20s on re-runs, which is most runs of this idempotent script.
+    local lists_stamp="/var/lib/apt/periodic/update-success-stamp"
+    local age=999999
+    [[ -f "$lists_stamp" ]] && age=$(( $(date +%s) - $(stat -c %Y "$lists_stamp" 2>/dev/null || echo 0) ))
+    if [[ "$age" -lt 21600 ]]; then
+        log_skip "Package index: fresh (updated $(( age / 60 )) min ago)"
+    else
+        log_action "Updating package index..."
+        apt-get "${APT_OPTS[@]}" update -y 2>&1 | tail -3
+        log_ok "Package index updated"
+    fi
 
-    log_action "Upgrading packages..."
-    DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y \
-        -o Dpkg::Options::="--force-confdef" \
-        -o Dpkg::Options::="--force-confold" 2>&1 \
-        | grep -v "automatically installed" \
-        | grep -v "apt autoremove" \
-        | tail -5
-    log_ok "System upgraded"
+    if $FLAG_NO_UPGRADE; then
+        log_skip "Dist-upgrade skipped (--no-upgrade)"
+    else
+        log_action "Upgrading packages..."
+        DEBIAN_FRONTEND=noninteractive apt-get "${APT_OPTS[@]}" dist-upgrade -y \
+            -o Dpkg::Options::="--force-confdef" \
+            -o Dpkg::Options::="--force-confold" 2>&1 \
+            | grep -v "automatically installed" \
+            | grep -v "apt autoremove" \
+            | tail -5
+        log_ok "System upgraded"
+    fi
 
     # Firmware
     if dpkg -l raspi-firmware 2>/dev/null | grep -qE "^ii"; then
@@ -232,9 +262,59 @@ step_packages() {
 }
 
 # ─────────────────────────────────────────────────────────────
+# Snapshots NM connections + sshd drop-in before either is touched, and
+# arms a persistent rollback timer (survives reboot). Safe to call more
+# than once per run — only the first call actually snapshots.
+arm_rollback() {
+    local snap="/etc/pizero/rollback-snapshot"
+    [[ -d "$snap" ]] && return 0   # already snapshotted this run
+
+    mkdir -p /etc/pizero
+    mkdir -p "$snap"
+    if [[ -d /etc/NetworkManager/system-connections ]]; then
+        cp -a /etc/NetworkManager/system-connections "${snap}/system-connections"
+    fi
+    if [[ -f /etc/ssh/sshd_config.d/pizero.conf ]]; then
+        cp -a /etc/ssh/sshd_config.d/pizero.conf "${snap}/pizero.conf"
+    else
+        touch "${snap}/no-sshd-conf"
+    fi
+
+    mkdir -p "$INSTALL_DIR"
+    cp -f "${SCRIPT_DIR}/pizero-rollback.sh" "${INSTALL_DIR}/pizero-rollback.sh"
+    chmod 755 "${INSTALL_DIR}/pizero-rollback.sh"
+    cp -f "${SCRIPT_DIR}/pizero-confirm.sh" /usr/local/bin/pizero-confirm
+    chmod 755 /usr/local/bin/pizero-confirm
+
+    cp -f "${PKG_DIR}/systemd/pizero-rollback.service" /etc/systemd/system/pizero-rollback.service
+    sed "s|%%ROLLBACK_MINUTES%%|${ROLLBACK_MINUTES}|g" \
+        "${PKG_DIR}/systemd/pizero-rollback.timer" > /etc/systemd/system/pizero-rollback.timer
+    systemctl daemon-reload
+    systemctl enable --now pizero-rollback.timer
+
+    log_ok "Rollback armed: reverts WiFi/SSH config in ${ROLLBACK_MINUTES} min unless 'sudo pizero-confirm' runs"
+}
+
+# Disarms the rollback timer immediately — call this when we can prove
+# from inside the same run that connectivity/SSH still work (no reboot
+# needed), so there's no need to wait out the timer.
+disarm_rollback_if_healthy() {
+    [[ -f /usr/local/bin/pizero-confirm ]] || return 0
+    local gw
+    gw=$(ip route show default 2>/dev/null | awk '/default/{print $3; exit}')
+    if [[ -n "$gw" ]] && ping -c1 -W3 "$gw" &>/dev/null \
+       && nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep -q "^wlan0:connected"; then
+        bash /usr/local/bin/pizero-confirm >/dev/null 2>&1 || true
+        log_ok "Connectivity confirmed — rollback timer disarmed"
+    else
+        log_warn "Could not confirm connectivity — rollback timer left armed (fires in ${ROLLBACK_MINUTES} min)"
+    fi
+}
+
 step_wifi() {
     section "STEP 3: WI-FI"
     dry "configure wifi" || return 0
+    arm_rollback
 
     # ── Regulatory domain ────────────────────────────────────
     log_action "Setting Wi-Fi regulatory domain: ${WIFI_COUNTRY}"
@@ -297,6 +377,23 @@ step_wifi() {
             || systemctl restart NetworkManager 2>/dev/null \
             || true
         log_ok "NetworkManager reloaded"
+
+        # Self-check: give NM a few seconds to (re)associate on the current
+        # boot (a fresh install still needs a reboot for driver/regdomain
+        # changes, but re-runs on an already-booted Pi can connect right
+        # away) and report whether it did — this is what disarm_rollback_if_healthy
+        # checks against at the end of the run.
+        local tries=0
+        nmcli device connect wlan0 &>/dev/null || true
+        while [[ $tries -lt 10 ]]; do
+            nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep -q "^wlan0:connected" && break
+            sleep 1; tries=$(( tries + 1 ))
+        done
+        if nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep -q "^wlan0:connected"; then
+            log_ok "WiFi self-check: wlan0 connected"
+        else
+            log_warn "WiFi self-check: wlan0 not yet connected (expected before reboot on a fresh install)"
+        fi
     fi
 
     REBOOT_REQUIRED=true
@@ -348,21 +445,11 @@ step_system() {
         log_info "nsswitch.conf: .local resolution already configured"
     fi
 
-    # ── SSH hardening ─────────────────────────────────────────
-    mkdir -p /etc/ssh/sshd_config.d/
-    cp -f "${PKG_DIR}/configs/pizero-sshd.conf" \
-          /etc/ssh/sshd_config.d/pizero.conf
-    if sshd -t 2>/dev/null; then
-        systemctl reload sshd 2>/dev/null \
-            || systemctl reload ssh 2>/dev/null \
-            || true
-        log_ok "SSH: hardening config applied"
-    else
-        log_warn "SSH config failed validation — reverting"
-        rm -f /etc/ssh/sshd_config.d/pizero.conf
-    fi
+    arm_rollback
 
     # ── SSH public key ────────────────────────────────────────
+    # (added before the hardening step below so the "authorized_keys
+    # non-empty" check sees a key added in this same run)
     if [[ -n "${SSH_PUBLIC_KEY:-}" ]]; then
         local ak="${REAL_HOME}/.ssh/authorized_keys"
         mkdir -p "${REAL_HOME}/.ssh"
@@ -375,8 +462,46 @@ step_system() {
         else
             log_info "SSH public key already present"
         fi
+    fi
+
+    # ── SSH hardening ─────────────────────────────────────────
+    local ak="${REAL_HOME}/.ssh/authorized_keys"
+    local has_key=false
+    [[ -s "$ak" ]] && has_key=true
+
+    mkdir -p /etc/ssh/sshd_config.d/
+    cp -f "${PKG_DIR}/configs/pizero-sshd.conf" \
+          /etc/ssh/sshd_config.d/pizero.conf
+
+    # PasswordAuthentication is only ever disabled when BOTH:
+    #  - harden is requested (SSH_HARDEN=1 env, set by bootstrap.ps1 only
+    #    after it has verified key login itself; or SSH_DISABLE_PASSWORD=yes
+    #    in pizero.conf for a manual/on-Pi run)
+    #  - authorized_keys for the real user is non-empty, so we can never
+    #    lock ourselves out
+    local harden_requested=false
+    [[ "${SSH_HARDEN:-0}" == "1" || "${SSH_DISABLE_PASSWORD:-no}" == "yes" ]] && harden_requested=true
+
+    if $harden_requested && $has_key; then
+        echo "PasswordAuthentication no" >> /etc/ssh/sshd_config.d/pizero.conf
+    fi
+
+    if sshd -t 2>/dev/null; then
+        systemctl reload sshd 2>/dev/null \
+            || systemctl reload ssh 2>/dev/null \
+            || true
+        if $harden_requested && $has_key; then
+            log_ok "SSH: hardening applied — PermitRootLogin no, PasswordAuthentication no"
+        elif $harden_requested && ! $has_key; then
+            log_warn "SSH hardening requested but ${ak} is empty — leaving password auth ON to avoid lockout"
+        elif $has_key; then
+            log_ok "SSH: key login available (password auth still on — set SSH_DISABLE_PASSWORD=yes or use bootstrap.ps1 to harden)"
+        else
+            log_ok "SSH: hardening config applied (PermitRootLogin no); password auth active — no key on file yet"
+        fi
     else
-        log_info "No SSH public key configured (password auth active)"
+        log_warn "SSH config failed validation — reverting"
+        rm -f /etc/ssh/sshd_config.d/pizero.conf
     fi
 }
 
@@ -742,6 +867,10 @@ F2BEOF
 # ─────────────────────────────────────────────────────────────
 step_hotspot() {
     section "STEP 9: WI-FI HOTSPOT FALLBACK"
+    if [[ "${INSTALL_HOTSPOT:-yes}" != "yes" ]]; then
+        log_skip "Hotspot fallback disabled (INSTALL_HOTSPOT=no in pizero.conf)"
+        return 0
+    fi
     dry "install hotspot" || return 0
 
     # ── Verify AP/STA concurrency capability ─────────────────
@@ -913,8 +1042,11 @@ step_clapper() {
     fi
 
     # ── systemd service ──────────────────────────────────────────
-    cp -f "${PKG_DIR}/systemd/clapper.service" \
-          /etc/systemd/system/clapper.service
+    sed \
+        -e "s|%%HOME%%|/home/${REAL_USER}|g" \
+        -e "s|%%USER%%|${REAL_USER}|g" \
+        "${PKG_DIR}/systemd/clapper.service" \
+        > /etc/systemd/system/clapper.service
     systemctl daemon-reload
     systemctl enable clapper.service
     log_ok "clapper.service: enabled"
@@ -993,8 +1125,11 @@ step_pcctl() {
     fi
 
     # ── systemd service ──────────────────────────────────────────
-    cp -f "${PKG_DIR}/systemd/pcctl.service" \
-          /etc/systemd/system/pcctl.service
+    sed \
+        -e "s|%%HOME%%|/home/${REAL_USER}|g" \
+        -e "s|%%USER%%|${REAL_USER}|g" \
+        "${PKG_DIR}/systemd/pcctl.service" \
+        > /etc/systemd/system/pcctl.service
     systemctl daemon-reload
     systemctl enable pcctl.service
     log_ok "pcctl.service: enabled"
@@ -1139,6 +1274,14 @@ main() {
     local t0; t0=$(date +%s)
 
     step_preflight
+
+    if $FLAG_CHECK; then
+        section "CHECK MODE — preflight + config validation only"
+        log_ok "pizero.conf validated (see load_config output above)"
+        log_info "No changes made. Re-run without --check to install."
+        return 0
+    fi
+
     step_backup
     step_update
     step_packages
@@ -1163,20 +1306,34 @@ main() {
     echo -e "  Backups:  ${BACKUP_DIR}"
     echo ""
 
-    if $REBOOT_REQUIRED && ! $FLAG_DRY_RUN; then
-        echo -e "  ${YELLOW}${BOLD}⚡ REBOOT REQUIRED for all changes to take effect.${NC}"
-        echo ""
-        if ! $FLAG_NO_REBOOT; then
-            read -rp "  Reboot now? [y/N] " r
-            if [[ "${r,,}" == "y" ]]; then
-                log_info "Rebooting in 5 seconds..."
-                sleep 5
-                reboot
+    if ! $FLAG_DRY_RUN; then
+        if $REBOOT_REQUIRED; then
+            touch /etc/pizero/rollback-reboot 2>/dev/null || true
+            echo -e "  ${YELLOW}${BOLD}⚡ REBOOT REQUIRED for all changes to take effect.${NC}"
+            if [[ -d /etc/pizero/rollback-snapshot ]]; then
+                echo -e "  Rollback armed: if the Pi doesn't come back with working WiFi/SSH,"
+                echo -e "  it reverts the network/SSH config automatically ~${ROLLBACK_MINUTES} min after boot."
+                echo -e "  Once you've confirmed it's fine:  sudo pizero-confirm"
+            fi
+            echo ""
+            if $FLAG_NO_REBOOT; then
+                log_info "Reboot skipped (--no-reboot) — run: sudo reboot"
+            elif [[ -t 0 ]]; then
+                read -rp "  Reboot now? [y/N] " r
+                if [[ "${r,,}" == "y" ]]; then
+                    log_info "Rebooting in 5 seconds..."
+                    sleep 5
+                    reboot
+                else
+                    log_info "Reboot skipped — run: sudo reboot"
+                fi
             else
-                log_info "Reboot skipped — run: sudo reboot"
+                log_info "Non-interactive session — reboot skipped. Run: sudo reboot"
             fi
         else
-            log_info "Reboot skipped (--no-reboot) — run: sudo reboot"
+            # No reboot needed — we can prove connectivity/SSH still work
+            # from right here, so don't make the operator wait out the timer.
+            disarm_rollback_if_healthy
         fi
     fi
 }
