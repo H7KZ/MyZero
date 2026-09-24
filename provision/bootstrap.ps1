@@ -43,7 +43,11 @@ param(
     [switch]$DryRun
 )
 
-$ErrorActionPreference = "Stop"
+# "Continue", not "Stop": under Windows PowerShell 5.1, anything a native
+# exe (ssh, tar) writes to stderr - even "Permanently added ... to known
+# hosts" - becomes a terminating NativeCommandError with "Stop". Native calls
+# are checked via $LASTEXITCODE; cmdlets opt in with -ErrorAction Stop.
+$ErrorActionPreference = "Continue"
 
 $RepoRoot     = Split-Path -Parent $PSScriptRoot
 $ProvisionDir = Join-Path $RepoRoot "provision"
@@ -87,7 +91,7 @@ Write-Host "Provisioning target: $Target" -ForegroundColor White
 Write-Step "Stage 1/6: SSH keypair"
 try {
     if (-not (Test-Path $KeysDir)) {
-        New-Item -ItemType Directory -Path $KeysDir | Out-Null
+        New-Item -ItemType Directory -Path $KeysDir -ErrorAction Stop | Out-Null
     }
 
     # Make sure .keys/ is gitignored (repo .gitignore should already have
@@ -96,7 +100,7 @@ try {
     if (Test-Path $gitignore) {
         $content = Get-Content $gitignore -Raw -ErrorAction SilentlyContinue
         if ($null -eq $content -or $content -notmatch '(?m)^\s*/?\.keys/?\s*$') {
-            Add-Content -Path $gitignore -Value "`n/.keys/"
+            Add-Content -Path $gitignore -Value "`n/.keys/" -ErrorAction Stop
             Write-Ok "Added /.keys/ to .gitignore"
         }
     }
@@ -136,7 +140,7 @@ try {
         Write-Ok "Key login already works - skipping password prompt"
     } else {
         Write-Note "Enter the Pi's password when prompted (default user 'zero' password is 'zero' unless you changed it)."
-        $pub = Get-Content $PubKeyPath -Raw
+        $pub = Get-Content $PubKeyPath -Raw -ErrorAction Stop
         $remoteCmd = "umask 077; mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys"
         # Pipe the public key into ssh's stdin - one password prompt, no
         # ssh-copy-id / sshpass needed.
@@ -169,13 +173,13 @@ try {
 Write-Step "Stage 4/6: Stage binaries and copy provision/"
 try {
     $binDir = Join-Path $ProvisionDir "bin"
-    if (-not (Test-Path $binDir)) { New-Item -ItemType Directory -Path $binDir | Out-Null }
+    if (-not (Test-Path $binDir)) { New-Item -ItemType Directory -Path $binDir -ErrorAction Stop | Out-Null }
 
     foreach ($b in $Bin) {
         $src = Join-Path $RepoRoot "target\aarch64-unknown-linux-gnu\release\$b"
         $dst = Join-Path $binDir $b
         if (Test-Path $src) {
-            Copy-Item -Path $src -Destination $dst -Force
+            Copy-Item -Path $src -Destination $dst -Force -ErrorAction Stop
             Write-Ok "Staged binary: provision/bin/$b"
         } else {
             Write-Warn2 "Binary not found, skipping: $src (build it first: cross build -p $b --target aarch64-unknown-linux-gnu --release)"
@@ -183,7 +187,7 @@ try {
         $envSrc = Join-Path $RepoRoot "apps\$b\.env"
         $envDst = Join-Path $binDir "$b.env"
         if (Test-Path $envSrc) {
-            Copy-Item -Path $envSrc -Destination $envDst -Force
+            Copy-Item -Path $envSrc -Destination $envDst -Force -ErrorAction Stop
             Write-Ok "Staged env: provision/bin/$b.env"
         }
     }
