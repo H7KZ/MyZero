@@ -4,7 +4,11 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
+# Config (PC_MAC, API_TOKEN, ...) is read at startup from ENV_FILE — a named
+# path rather than the default ./.env, since clapper and pcctl share
+# /home/pi. Deploy it there, chmod 600, before starting the service.
 WorkingDirectory=/home/pi
+Environment=ENV_FILE=/home/pi/pcctl.env
 ExecStart=/home/pi/pcctl serve
 Restart=always
 RestartSec=5

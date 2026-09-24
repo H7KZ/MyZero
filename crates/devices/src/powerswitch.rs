@@ -24,7 +24,11 @@
 //! 3. **Every pulse is bounded** by [`MAX_HOLD`] and released by a `Drop` guard,
 //!    so a panic mid-press still lets the button go.
 //! 4. **A cooldown** rejects a second actuation too soon after the last, so a
-//!    stuck client can't power-cycle the machine in a loop.
+//!    stuck client can't power-cycle the machine in a loop. This driver holds
+//!    only the in-actuation state (one press at a time); the cross-actuation
+//!    cooldown lives in the caller, which builds a fresh [`PowerSwitch`] per
+//!    actuation and so is the only thing with memory across them — see
+//!    `apps/pcctl/src/control.rs`'s `LAST_ACTUATION`.
 //!
 //! Residual risk: `rppal` resets pins on drop, but `Drop` does not run if the
 //! process is killed outright (`SIGKILL`). A kill landing inside the ~250 ms
@@ -35,7 +39,7 @@
 //! braces.
 
 use rppal::gpio::{Gpio, InputPin, OutputPin};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Longest any single actuation may assert the pin. A real ATX board force-offs
 /// after ~4 s, so anything past this is a bug, not an intention.
@@ -49,8 +53,6 @@ pub const MIN_SAFE_PIN: u8 = 9;
 pub enum Error {
     /// BCM 0–8 float high at boot and would hold the button down.
     UnsafePin(u8),
-    /// Another actuation happened too recently.
-    Cooldown(Duration),
     /// The GPIO itself is unavailable (not a Pi, pin busy, no permission).
     Gpio(rppal::gpio::Error),
 }
@@ -62,9 +64,6 @@ impl std::fmt::Display for Error {
                 f,
                 "BCM {pin} boots with a pull-up and would hold the button down — use {MIN_SAFE_PIN}–27"
             ),
-            Error::Cooldown(left) => {
-                write!(f, "cooling down, {} s left", left.as_secs().max(1))
-            }
             Error::Gpio(e) => write!(f, "GPIO unavailable: {e}"),
         }
     }
@@ -84,8 +83,6 @@ impl From<rppal::gpio::Error> for Error {
 /// an input, which the optocoupler reads as "not pressed".
 pub struct PowerSwitch {
     pin: OutputPin,
-    cooldown: Duration,
-    last_release: Option<Instant>,
 }
 
 impl PowerSwitch {
@@ -94,31 +91,24 @@ impl PowerSwitch {
     /// Returns `Err` rather than panicking: this runs inside a long-lived
     /// service, where "no GPIO here" should degrade to a clear message rather
     /// than take the whole control API down.
-    pub fn new(pin: u8, cooldown: Duration) -> Result<Self, Error> {
+    ///
+    /// There is no cooldown here: a fresh `PowerSwitch` is built for every
+    /// actuation (see the module doc), so nothing in this type persists
+    /// across two of them. The cross-actuation cooldown is the caller's job.
+    pub fn new(pin: u8) -> Result<Self, Error> {
         if pin < MIN_SAFE_PIN {
             return Err(Error::UnsafePin(pin));
         }
         // into_output_low() drives the pin before returning, so this doubles as
         // "release anything a previous crash left asserted".
         let pin = Gpio::new()?.get(pin)?.into_output_low();
-        Ok(Self {
-            pin,
-            cooldown,
-            last_release: None,
-        })
+        Ok(Self { pin })
     }
 
     /// Asserts the switch for `hold`, clamped to [`MAX_HOLD`].
     ///
     /// Returns how long it was actually held.
     pub fn actuate(&mut self, hold: Duration) -> Result<Duration, Error> {
-        if let Some(last) = self.last_release {
-            let since = last.elapsed();
-            if since < self.cooldown {
-                return Err(Error::Cooldown(self.cooldown - since));
-            }
-        }
-
         let hold = hold.min(MAX_HOLD);
         {
             // The guard releases the pin on the way out of this scope — normal
@@ -126,7 +116,6 @@ impl PowerSwitch {
             let _pressed = Pressed::assert(&mut self.pin);
             std::thread::sleep(hold);
         }
-        self.last_release = Some(Instant::now());
         Ok(hold)
     }
 }

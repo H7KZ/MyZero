@@ -23,14 +23,15 @@ pub struct Departure {
 }
 
 pub async fn fetch(client: &reqwest::Client) -> Result<DeparturesResponse, reqwest::Error> {
-    let url = format!("{}/departures", config::BACKEND_URL);
+    let cfg = config::get();
+    let url = format!("{}/departures", cfg.backend_url);
 
     let mut builder = client
         .get(&url)
-        .timeout(Duration::from_secs(config::BACKEND_TIMEOUT_SECS));
+        .timeout(Duration::from_secs(cfg.backend_timeout_secs));
 
-    if !config::BACKEND_API_KEY.is_empty() {
-        builder = builder.bearer_auth(config::BACKEND_API_KEY);
+    if !cfg.backend_api_key.is_empty() {
+        builder = builder.bearer_auth(&cfg.backend_api_key);
     }
 
     builder.send().await?.json::<DeparturesResponse>().await

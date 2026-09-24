@@ -109,7 +109,8 @@ fn gated(verb: &str, f: impl FnOnce() -> Outcome) -> Outcome {
 
 /// Does the PC answer on its probe port?
 pub fn is_up() -> bool {
-    probe::tcp_up(config::PC_HOST, config::PC_PROBE_PORT, PROBE_TIMEOUT)
+    let cfg = config::get();
+    probe::tcp_up(&cfg.pc_host, cfg.pc_probe_port, PROBE_TIMEOUT)
 }
 
 /// Current state, as a one-liner plus the raw flags.
@@ -117,9 +118,10 @@ pub fn is_up() -> bool {
 /// Not gated: reading state should always work, including while a wake is
 /// still waiting for the PC to come up.
 pub fn status() -> Outcome {
+    let cfg = config::get();
     let up = is_up();
     let led = hardware::power_led();
-    let where_ = format!("{}:{}", config::PC_HOST, config::PC_PROBE_PORT);
+    let where_ = format!("{}:{}", cfg.pc_host, cfg.pc_probe_port);
 
     let mut message = if up {
         format!("up — {where_} answering")
@@ -152,14 +154,15 @@ pub fn status() -> Outcome {
 /// already-running machine is a no-op, so there's nothing to guard against.
 pub fn wake(wait: bool) -> Outcome {
     gated("wake", || {
-        let broadcasts = config::wol_broadcasts();
-        let ports = config::wol_ports();
+        let cfg = config::get();
+        let broadcasts: Vec<&str> = cfg.wol_broadcasts.iter().map(String::as_str).collect();
+        let ports = &cfg.wol_ports;
 
-        let sent = match wol::Wake::new(config::PC_MAC)
+        let sent = match wol::Wake::new(&cfg.pc_mac)
             .broadcasts(&broadcasts)
-            .ports(&ports)
-            .repeat(config::WOL_REPEAT)
-            .bind(config::wol_bind())
+            .ports(ports)
+            .repeat(cfg.wol_repeat)
+            .bind(cfg.wol_bind.as_deref())
             .send()
         {
             Ok(n) => n,
@@ -168,7 +171,7 @@ pub fn wake(wait: bool) -> Outcome {
 
         let sprayed = format!(
             "{sent} magic packets for {} → {}",
-            config::PC_MAC,
+            cfg.pc_mac,
             broadcasts.join(", ")
         );
 
@@ -176,10 +179,10 @@ pub fn wake(wait: bool) -> Outcome {
             return Outcome::ok(format!("sent {sprayed}"));
         }
 
-        let deadline = Duration::from_secs(config::WAKE_TIMEOUT_SECS);
+        let deadline = Duration::from_secs(cfg.wake_timeout_secs);
         match probe::wait_up(
-            config::PC_HOST,
-            config::PC_PROBE_PORT,
+            &cfg.pc_host,
+            cfg.pc_probe_port,
             PROBE_TIMEOUT,
             PROBE_INTERVAL,
             deadline,
@@ -189,8 +192,8 @@ pub fn wake(wait: bool) -> Outcome {
             }
             None => Outcome::err(format!(
                 "sent {sprayed}, but {}:{} stayed silent for {}s",
-                config::PC_HOST,
-                config::PC_PROBE_PORT,
+                cfg.pc_host,
+                cfg.pc_probe_port,
                 deadline.as_secs()
             ))
             .with_up(false),
@@ -202,13 +205,15 @@ pub fn wake(wait: bool) -> Outcome {
 
 /// Runs `SLEEP_COMMAND` on the PC.
 pub fn sleep() -> Outcome {
-    gated("sleep", || power_down("sleep", config::SLEEP_COMMAND))
+    gated("sleep", || {
+        power_down("sleep", &config::get().sleep_command)
+    })
 }
 
 /// Runs `SHUTDOWN_COMMAND` on the PC.
 pub fn shutdown() -> Outcome {
     gated("shutdown", || {
-        power_down("shutdown", config::SHUTDOWN_COMMAND)
+        power_down("shutdown", &config::get().shutdown_command)
     })
 }
 
@@ -223,7 +228,10 @@ fn power_down(verb: &str, command: &str) -> Outcome {
         // Not an error: the PC is already off, which is what was asked for.
         return Outcome::ok(format!("{verb}: PC already down")).with_up(false);
     }
-    match run(command, Duration::from_secs(config::COMMAND_TIMEOUT_SECS)) {
+    match run(
+        command,
+        Duration::from_secs(config::get().command_timeout_secs),
+    ) {
         Ok(out) if out.status_ok => Outcome::ok(format!("{verb} sent{}", tail(&out.text))),
         Ok(out) => Outcome::err(format!("{verb} command failed{}", tail(&out.text))),
         Err(e) => Outcome::err(format!("{verb} command could not run: {e}")),
@@ -248,7 +256,7 @@ pub fn actuate(what: Actuation, confirmed: bool) -> Outcome {
 
         // Enforced here rather than in the driver: each actuation builds a
         // fresh PowerSwitch, so only the process remembers the previous one.
-        let cooldown = Duration::from_secs(config::PRESS_COOLDOWN_SECS);
+        let cooldown = Duration::from_secs(config::get().press_cooldown_secs);
         let mut last = match LAST_ACTUATION.lock() {
             Ok(guard) => guard,
             // A panic inside a previous actuation poisoned the lock. The

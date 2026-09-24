@@ -1,6 +1,6 @@
 PI_HOST = pi@raspberrypi.local
 TARGET  = aarch64-unknown-linux-gnu
-# Which app to deploy/run. Override: make run BIN=voice-assistant
+# Which app to deploy/run. Override: make run BIN=clapper
 BIN    ?= departure-board
 
 .PHONY: build deploy ship check run

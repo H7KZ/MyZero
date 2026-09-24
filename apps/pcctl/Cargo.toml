@@ -1,7 +1,7 @@
 [package]
 name = "pcctl"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [[bin]]
 name = "pcctl"
@@ -19,3 +19,7 @@ gpio = ["dep:devices"]
 # std, so it cross-compiles to the Pi with nothing but a linker.
 net = { path = "../../crates/net" }                          # wake-on-lan + TCP liveness probe
 devices = { path = "../../crates/devices", optional = true } # front-panel switch + power LED
+appconfig = { workspace = true }                              # runtime .env / env-var config
+
+[lints]
+workspace = true

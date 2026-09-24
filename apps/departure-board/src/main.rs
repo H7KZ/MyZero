@@ -19,17 +19,24 @@ enum State {
 
 #[tokio::main]
 async fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if let Err(e) = config::load(args) {
+        eprintln!("[departure-board] config error: {e}");
+        std::process::exit(1);
+    }
+    let cfg = config::get();
+
     println!("=== Departure Board ===");
-    println!("Backend:       {}", config::BACKEND_URL);
-    println!("Stop fallback: {}", config::STOP_NAME);
-    println!("Button pin:    {:?}", config::BUTTON_GPIO_PIN);
-    println!("LED pin:       {:?}", config::LED_GPIO_PIN);
+    println!("Backend:       {}", cfg.backend_url);
+    println!("Stop fallback: {}", cfg.stop_name);
+    println!("Button pin:    {:?}", cfg.button_gpio_pin);
+    println!("LED pin:       {:?}", cfg.led_gpio_pin);
 
     let client = reqwest::Client::new();
     let mut display = display::init();
-    let pir = motion::init_pin(config::PIR_GPIO_PIN);
-    let mut button = config::BUTTON_GPIO_PIN.map(button::Button::new);
-    let mut led = config::LED_GPIO_PIN.map(led::Led::new);
+    let pir = motion::init_pin(cfg.pir_gpio_pin);
+    let mut button = cfg.button_gpio_pin.map(button::Button::new);
+    let mut led = cfg.led_gpio_pin.map(led::Led::new);
 
     display::show_status(&mut display, "Cekam na pohyb...");
 
@@ -62,11 +69,8 @@ async fn main() {
                     s.last_motion = Instant::now();
                 }
 
-                if s.last_motion.elapsed().as_secs() >= config::IDLE_TIMEOUT_SECS {
-                    println!(
-                        "[IDLE] No motion for {}s — sleeping",
-                        config::IDLE_TIMEOUT_SECS
-                    );
+                if s.last_motion.elapsed().as_secs() >= cfg.idle_timeout_secs {
+                    println!("[IDLE] No motion for {}s — sleeping", cfg.idle_timeout_secs);
                     display::sleep(&mut display);
                     if let Some(l) = &mut led {
                         l.off();
@@ -83,7 +87,7 @@ async fn main() {
                     // Periodic fetch
                     let should_fetch = s
                         .last_fetch
-                        .map(|t| t.elapsed().as_secs() >= config::POLL_INTERVAL_SECS)
+                        .map(|t| t.elapsed().as_secs() >= cfg.poll_interval_secs)
                         .unwrap_or(true);
 
                     if should_fetch {
@@ -121,6 +125,6 @@ async fn main() {
 fn render_stop(display: &mut display::Display, s: &ActiveState) {
     let stop = &s.stops[s.current_stop];
     let header = board::header(&stop.stop_name, s.current_stop, s.stops.len());
-    let rows = board::render(&stop.departures, config::MAX_DEPARTURES);
+    let rows = board::render(&stop.departures, config::get().max_departures);
     display::render_board(display, &header, &rows);
 }

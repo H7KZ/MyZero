@@ -1,0 +1,12 @@
+[package]
+name = "appconfig"
+edition.workspace = true
+version.workspace = true
+
+# Tiny runtime config loader shared by clapper, departure-board and pcctl.
+# Deliberately dependency-free.
+
+[dependencies]
+
+[lints]
+workspace = true

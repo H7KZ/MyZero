@@ -1,7 +1,7 @@
 [package]
 name = "clapper"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [[bin]]
 name = "clapper"
@@ -11,3 +11,7 @@ path = "src/main.rs"
 # Shared workspace crates
 devices = { path = "../../crates/devices" } # sound sensor (D0), LED, OLED
 net = { path = "../../crates/net" }         # wake-on-lan
+appconfig = { workspace = true }            # runtime .env / env-var config
+
+[lints]
+workspace = true

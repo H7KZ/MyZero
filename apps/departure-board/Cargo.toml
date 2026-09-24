@@ -1,7 +1,7 @@
 [package]
 name = "departure-board"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [[bin]]
 name = "departure-board"
@@ -9,9 +9,13 @@ path = "src/main.rs"
 
 [dependencies]
 devices = { path = "../../crates/devices" }
+appconfig = { workspace = true }
 
 tokio = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
+
+[lints]
+workspace = true

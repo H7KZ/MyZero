@@ -20,6 +20,12 @@ mod http;
 ///   pcctl serve             HTTP control API on LISTEN_ADDR
 ///   pcctl config            print the baked-in configuration
 fn main() {
+    let all_args: Vec<String> = std::env::args().collect();
+    if let Err(e) = config::load(all_args) {
+        eprintln!("[pcctl] config error: {e}");
+        std::process::exit(1);
+    }
+
     let args: Vec<String> = std::env::args().skip(1).collect();
     let cmd = args.first().map(String::as_str).unwrap_or("status");
     let flags: Vec<&str> = args.iter().skip(1).map(String::as_str).collect();
@@ -81,36 +87,37 @@ pcctl — remote power control for the PC
   pcctl serve             HTTP control API on LISTEN_ADDR
   pcctl config            print the baked-in configuration
 
-Configuration is baked in at compile time from apps/pcctl/.env."
+Configuration is read at startup from the environment, plus an optional \
+.env file (--config <path> / ENV_FILE, else .env next to the binary or in \
+the CWD)."
     );
 }
 
 fn print_config() {
-    println!("config source:  apps/pcctl/{}", config::CONFIG_SOURCE);
-    println!("PC_MAC:         {}", config::PC_MAC);
-    println!(
-        "probe:          {}:{}",
-        config::PC_HOST,
-        config::PC_PROBE_PORT
-    );
+    let cfg = config::get();
+    println!("config source:  {}", cfg.source);
+    println!("PC_MAC:         {}", cfg.pc_mac);
+    println!("probe:          {}:{}", cfg.pc_host, cfg.pc_probe_port);
     println!(
         "wol:            {} ports {:?} ×{} bursts, from {}",
-        config::wol_broadcasts().join(", "),
-        config::wol_ports(),
-        config::WOL_REPEAT,
-        config::wol_bind().unwrap_or("(kernel picks interface)")
+        cfg.wol_broadcasts.join(", "),
+        cfg.wol_ports,
+        cfg.wol_repeat,
+        cfg.wol_bind
+            .as_deref()
+            .unwrap_or("(kernel picks interface)")
     );
     println!(
         "front panel:    {}",
-        match (config::POWER_SW_GPIO_PIN, config::RESET_SW_GPIO_PIN) {
+        match (cfg.power_sw_gpio_pin, cfg.reset_sw_gpio_pin) {
             (None, None) => "(no switch wired)".to_string(),
             (pwr, rst) => format!(
                 "PWR_SW {}, RESET_SW {}, LED {} — press {} ms, force-off {} ms",
                 pin(pwr),
                 pin(rst),
-                pin(config::POWER_LED_GPIO_PIN),
-                config::PRESS_MS,
-                config::FORCE_OFF_MS
+                pin(cfg.power_led_gpio_pin),
+                cfg.press_ms,
+                cfg.force_off_ms
             ),
         }
     );
@@ -122,18 +129,18 @@ fn print_config() {
             "absent (--no-default-features build)"
         }
     );
-    println!("sleep:          {}", or_unset(config::SLEEP_COMMAND));
-    println!("shutdown:       {}", or_unset(config::SHUTDOWN_COMMAND));
-    println!("listen:         {}", config::LISTEN_ADDR);
+    println!("sleep:          {}", or_unset(&cfg.sleep_command));
+    println!("shutdown:       {}", or_unset(&cfg.shutdown_command));
+    println!("listen:         {}", cfg.listen_addr);
     println!(
         "api token:      {}",
-        if config::API_TOKEN.trim().is_empty() {
+        if cfg.api_token.trim().is_empty() {
             "(unset — serve refuses any non-loopback bind)"
         } else {
             "(set)"
         }
     );
-    println!("wake timeout:   {}s", config::WAKE_TIMEOUT_SECS);
+    println!("wake timeout:   {}s", cfg.wake_timeout_secs);
 }
 
 fn pin(value: Option<u8>) -> String {

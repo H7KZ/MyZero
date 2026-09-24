@@ -43,12 +43,15 @@ impl Drop for ConnectionSlot {
 
 /// Binds `LISTEN_ADDR` and serves until killed.
 pub fn serve() -> std::io::Result<()> {
-    let addr = config::LISTEN_ADDR;
-    let token = config::API_TOKEN.trim();
+    let cfg = config::get();
+    let addr = cfg.listen_addr.as_str();
+    let token = cfg.api_token.trim();
 
     // An unauthenticated wake/shutdown endpoint reachable off-box is a remote
     // power switch for anyone who can route to it. Loopback is the only place
-    // it's defensible.
+    // it's defensible. `config::load` already refuses to start in this shape,
+    // but the check stays here too as a second, independent guard right
+    // before the socket actually opens.
     if token.is_empty() && !is_loopback(addr) {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -189,8 +192,8 @@ fn outcome_json(outcome: control::Outcome) -> Response {
         tristate(outcome.up),
         tristate(outcome.led),
         control::hardware_available(),
-        escape(config::PC_HOST),
-        escape(config::PC_MAC),
+        escape(&config::get().pc_host),
+        escape(&config::get().pc_mac),
     );
     Response::json(if outcome.ok { 200 } else { 502 }, body, &[])
 }
@@ -270,7 +273,7 @@ fn read_head(reader: &mut BufReader<TcpStream>) -> std::io::Result<Option<Reques
 
 /// Bearer header or `?token=`; the query form is what Moonlight's GET can carry.
 fn authorized(request: &Request, query: &str) -> bool {
-    let expected = config::API_TOKEN.trim();
+    let expected = config::get().api_token.trim();
     if expected.is_empty() {
         return true; // serve() already refused to bind anything but loopback
     }
@@ -489,8 +492,8 @@ function danger(path, verb) {{
 call('GET', '/status');
 </script>
 "##,
-        host = escape(config::PC_HOST),
-        mac = escape(config::PC_MAC),
+        host = escape(&config::get().pc_host),
+        mac = escape(&config::get().pc_mac),
     )
 }
 

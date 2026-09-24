@@ -16,7 +16,13 @@ use std::time::{Duration, Instant};
 ///   clapper run    run the clap detector
 ///   clapper wol    send the WoL magic packet once (test)
 fn main() {
-    let cmd = std::env::args().nth(1).unwrap_or_else(|| "run".into());
+    let args: Vec<String> = std::env::args().collect();
+    if let Err(e) = config::load(args.iter().cloned()) {
+        eprintln!("[clapper] config error: {e}");
+        std::process::exit(1);
+    }
+
+    let cmd = args.get(1).cloned().unwrap_or_else(|| "run".into());
     match cmd.as_str() {
         "run" => run(),
         "wol" => send_wol(),
@@ -31,17 +37,18 @@ fn run() {
     println!("=== Clapper ===");
     println!(
         "Clap {}x within {} ms → Wake-on-LAN",
-        config::CLAP_COUNT,
-        config::CLAP_WINDOW_MS
+        config::get().clap_count,
+        config::get().clap_window_ms
     );
 
-    let mut fb = feedback::Feedback::init(config::LED_GPIO_PIN, config::ENABLE_OLED);
-    let mut sound = Sound::new(config::SOUND_GPIO_PIN, config::CLAP_DEBOUNCE_MS);
-    let window = Duration::from_millis(config::CLAP_WINDOW_MS);
+    let cfg = config::get();
+    let mut fb = feedback::Feedback::init(cfg.led_gpio_pin, cfg.enable_oled);
+    let mut sound = Sound::new(cfg.sound_gpio_pin, cfg.clap_debounce_ms);
+    let window = Duration::from_millis(cfg.clap_window_ms);
 
     // Timestamps of the claps still inside the rolling window.
     let mut claps: VecDeque<Instant> = VecDeque::new();
-    fb.idle(config::CLAP_COUNT);
+    fb.idle(cfg.clap_count);
 
     loop {
         let now = Instant::now();
@@ -57,19 +64,19 @@ fn run() {
             }
         }
         if had_claps && claps.is_empty() {
-            fb.idle(config::CLAP_COUNT);
+            fb.idle(cfg.clap_count);
         }
 
         if sound.clapped() {
             claps.push_back(now);
             let n = claps.len() as u32;
-            println!("[clap] {n}/{}", config::CLAP_COUNT);
-            fb.clap(n, config::CLAP_COUNT);
+            println!("[clap] {n}/{}", cfg.clap_count);
+            fb.clap(n, cfg.clap_count);
 
-            if n >= config::CLAP_COUNT {
+            if n >= cfg.clap_count {
                 trigger(&mut fb);
                 claps.clear();
-                fb.idle(config::CLAP_COUNT);
+                fb.idle(cfg.clap_count);
             }
         }
 
@@ -79,12 +86,9 @@ fn run() {
 
 /// The clap pattern matched — send the magic packet.
 fn trigger(fb: &mut feedback::Feedback) {
-    println!("[trigger] Wake-on-LAN → {}", config::WOL_TARGET_MAC);
-    let msg = match wol::send(
-        config::WOL_TARGET_MAC,
-        config::WOL_BROADCAST_ADDR,
-        config::WOL_PORT,
-    ) {
+    let cfg = config::get();
+    println!("[trigger] Wake-on-LAN → {}", cfg.wol_target_mac);
+    let msg = match wol::send(&cfg.wol_target_mac, &cfg.wol_broadcast_addr, cfg.wol_port) {
         Ok(()) => "Zapinam pocitac",
         Err(e) => {
             eprintln!("[wol] {e}");
@@ -95,17 +99,12 @@ fn trigger(fb: &mut feedback::Feedback) {
 }
 
 fn send_wol() {
+    let cfg = config::get();
     println!(
         "[WoL] {} → {}:{}",
-        config::WOL_TARGET_MAC,
-        config::WOL_BROADCAST_ADDR,
-        config::WOL_PORT
+        cfg.wol_target_mac, cfg.wol_broadcast_addr, cfg.wol_port
     );
-    match wol::send(
-        config::WOL_TARGET_MAC,
-        config::WOL_BROADCAST_ADDR,
-        config::WOL_PORT,
-    ) {
+    match wol::send(&cfg.wol_target_mac, &cfg.wol_broadcast_addr, cfg.wol_port) {
         Ok(()) => println!("[WoL] magic packet sent"),
         Err(e) => {
             eprintln!("[WoL] failed: {e}");

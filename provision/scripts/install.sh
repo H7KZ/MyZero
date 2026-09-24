@@ -881,6 +881,8 @@ step_clapper() {
 
     local bin_src="${PKG_DIR}/bin/clapper"
     local bin_dst="/home/${REAL_USER}/clapper"
+    local env_src="${PKG_DIR}/bin/clapper.env"
+    local env_dst="/home/${REAL_USER}/clapper.env"
 
     # ── Binary ───────────────────────────────────────────────────
     if [[ ! -f "$bin_src" ]]; then
@@ -892,6 +894,22 @@ step_clapper() {
         chmod 755 "$bin_dst"
         chown "${REAL_USER}:${REAL_USER}" "$bin_dst"
         log_ok "Binary deployed: ${bin_dst}"
+    fi
+
+    # ── Config ───────────────────────────────────────────────────
+    # clapper now reads apps/clapper/.env at startup instead of baking it in
+    # at compile time, so it has to actually be on the Pi. It's gitignored
+    # (holds the real WoL target MAC), so this step is best-effort.
+    if [[ -f "$env_src" ]]; then
+        cp -f "$env_src" "$env_dst"
+        chmod 600 "$env_dst"
+        chown "${REAL_USER}:${REAL_USER}" "$env_dst"
+        log_ok "Config deployed: ${env_dst}"
+    elif [[ -f "$env_dst" ]]; then
+        log_ok "Config already present: ${env_dst}"
+    else
+        log_warn "No .env at ${env_dst} — clapper will refuse to start"
+        log_warn "Copy your apps/clapper/.env there (e.g. scp), or set env vars in the service."
     fi
 
     # ── systemd service ──────────────────────────────────────────
@@ -918,6 +936,8 @@ step_pcctl() {
 
     local bin_src="${PKG_DIR}/bin/pcctl"
     local bin_dst="/home/${REAL_USER}/pcctl"
+    local env_src="${PKG_DIR}/bin/pcctl.env"
+    local env_dst="/home/${REAL_USER}/pcctl.env"
 
     # ── Binary ───────────────────────────────────────────────────
     if [[ ! -f "$bin_src" ]]; then
@@ -929,6 +949,24 @@ step_pcctl() {
         chmod 755 "$bin_dst"
         chown "${REAL_USER}:${REAL_USER}" "$bin_dst"
         log_ok "Binary deployed: ${bin_dst}"
+    fi
+
+    # ── Config ───────────────────────────────────────────────────
+    # pcctl now reads apps/pcctl/.env at startup instead of baking it in at
+    # compile time, so it has to actually be on the Pi. It's gitignored
+    # (holds PC_MAC and API_TOKEN), so this step is best-effort. pcctl.service
+    # points ENV_FILE at pcctl.env specifically, so this doesn't collide with
+    # clapper's own env file in the same home directory.
+    if [[ -f "$env_src" ]]; then
+        cp -f "$env_src" "$env_dst"
+        chmod 600 "$env_dst"
+        chown "${REAL_USER}:${REAL_USER}" "$env_dst"
+        log_ok "Config deployed: ${env_dst}"
+    elif [[ -f "$env_dst" ]]; then
+        log_ok "Config already present: ${env_dst}"
+    else
+        log_warn "No .env at ${env_dst} — pcctl will refuse to start"
+        log_warn "Copy your apps/pcctl/.env there (e.g. scp), or set env vars in the service."
     fi
 
     # ── SSH key for the power-down commands ──────────────────────

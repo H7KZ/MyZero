@@ -43,18 +43,20 @@ impl Actuation {
 
     #[cfg_attr(not(feature = "gpio"), allow(dead_code))]
     fn hold(self) -> Duration {
+        let cfg = config::get();
         Duration::from_millis(match self {
-            Actuation::Press => config::PRESS_MS,
-            Actuation::ForceOff => config::FORCE_OFF_MS,
-            Actuation::Reset => config::RESET_MS,
+            Actuation::Press => cfg.press_ms,
+            Actuation::ForceOff => cfg.force_off_ms,
+            Actuation::Reset => cfg.reset_ms,
         })
     }
 
     #[cfg_attr(not(feature = "gpio"), allow(dead_code))]
     fn pin(self) -> Option<u8> {
+        let cfg = config::get();
         match self {
-            Actuation::Press | Actuation::ForceOff => config::POWER_SW_GPIO_PIN,
-            Actuation::Reset => config::RESET_SW_GPIO_PIN,
+            Actuation::Press | Actuation::ForceOff => cfg.power_sw_gpio_pin,
+            Actuation::Reset => cfg.reset_sw_gpio_pin,
         }
     }
 }
@@ -78,13 +80,11 @@ mod imp {
             ));
         };
 
-        let cooldown = Duration::from_secs(config::PRESS_COOLDOWN_SECS);
-        let mut switch =
-            PowerSwitch::new(pin, cooldown).map_err(|e| format!("{}: {e}", what.name()))?;
+        let mut switch = PowerSwitch::new(pin).map_err(|e| format!("{}: {e}", what.name()))?;
 
-        // The cooldown lives in the driver, but a switch built fresh for each
-        // actuation has no memory of the last one — so the caller (control.rs)
-        // holds the process-wide gate. This one is the in-actuation guard.
+        // The cooldown across actuations is enforced by the caller
+        // (control.rs)'s process-wide `LAST_ACTUATION` — a switch built fresh
+        // for each actuation has no memory of the last one to enforce it here.
         let held = switch
             .actuate(what.hold())
             .map_err(|e| format!("{}: {e}", what.name()))?;
@@ -99,8 +99,9 @@ mod imp {
     /// `Some(true)` if the PC's power LED is lit, `None` if no LED is wired or
     /// the GPIO can't be read.
     pub fn power_led() -> Option<bool> {
-        let pin = config::POWER_LED_GPIO_PIN?;
-        PowerLed::new(pin, config::POWER_LED_INVERT)
+        let cfg = config::get();
+        let pin = cfg.power_led_gpio_pin?;
+        PowerLed::new(pin, cfg.power_led_invert)
             .ok()
             .map(|led| led.is_lit())
     }
@@ -108,13 +109,13 @@ mod imp {
     /// Drives every configured switch low, releasing anything a previous crash
     /// left asserted. Called once at service start.
     pub fn release_all() {
-        let cooldown = Duration::from_secs(0);
-        for pin in [config::POWER_SW_GPIO_PIN, config::RESET_SW_GPIO_PIN]
+        let cfg = config::get();
+        for pin in [cfg.power_sw_gpio_pin, cfg.reset_sw_gpio_pin]
             .into_iter()
             .flatten()
         {
             // Construction drives the pin low; dropping it hands the pin back.
-            match PowerSwitch::new(pin, cooldown) {
+            match PowerSwitch::new(pin) {
                 Ok(_) => println!("[pcctl] released BCM {pin}"),
                 Err(e) => eprintln!("[pcctl] could not release BCM {pin}: {e}"),
             }
@@ -122,7 +123,8 @@ mod imp {
     }
 
     pub fn available() -> bool {
-        config::POWER_SW_GPIO_PIN.is_some() || config::RESET_SW_GPIO_PIN.is_some()
+        let cfg = config::get();
+        cfg.power_sw_gpio_pin.is_some() || cfg.reset_sw_gpio_pin.is_some()
     }
 }
 

@@ -1,7 +1,7 @@
 [package]
 name = "devices"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 # Shared drivers for the Pi Zero 2's physical peripherals on the breadboard:
 # OLED (SH1106), LED, button, PIR motion sensor. App-agnostic.
@@ -11,3 +11,6 @@ rppal = { workspace = true }
 sh1106 = { workspace = true }
 embedded-graphics = { workspace = true }
 linux-embedded-hal = { workspace = true }
+
+[lints]
+workspace = true
