@@ -5,6 +5,7 @@ members = [
     "crates/net",
     "apps/departure-board",
     "apps/clapper",
+    "apps/pcctl",
 ]
 
 # Shared dependency versions — apps/crates pull these via `{ workspace = true }`.

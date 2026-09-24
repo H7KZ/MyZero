@@ -8,4 +8,5 @@ pub mod button;
 pub mod display;
 pub mod led;
 pub mod motion;
+pub mod powerswitch;
 pub mod sound;
