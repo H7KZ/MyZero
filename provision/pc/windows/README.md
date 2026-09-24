@@ -32,8 +32,10 @@ Re-running is the update path, same as the Pi's `install.sh`.
 ## What it changes
 
 1. **NIC** — `WakeOnMagicPacket` on, `WakeOnPattern` off (pattern wake fires on ordinary broadcast traffic and the PC
-   would never stay asleep), Energy-Efficient/Green Ethernet off, `powercfg /deviceenablewake`, and `PnPCapabilities`
-   set so Windows may not power the adapter down.
+   would never stay asleep), Energy-Efficient/Green Ethernet off, `powercfg /deviceenablewake`, and the adapter's
+   `MSPower_DeviceEnable` WMI setting so Windows may not power it down. Deliberately **not** the `PnPCapabilities`
+   registry value some guides use — its bit meanings are unreliable across drivers; see
+   `Setup-RemotePower.ps1` for the actual mechanism.
 2. **Power policy** — `HiberbootEnabled = 0`. Fast Startup is a hybrid shutdown into S4, and Windows *deliberately*
    disarms the NIC on that transition; it is the most common reason WoL "stops working after a shutdown".
 3. **OpenSSH Server** — installed, set to Automatic, firewall opened on **private/domain profiles only**.
@@ -72,4 +74,4 @@ ssh -i ~/.ssh/id_pcctl pcpower@<pc-ip> whoami     # should be REFUSED
 
 That last line failing is the security model working.
 
-Background and the Linux equivalent: [`docs/remote-pc-control.md`](../../../docs/remote-pc-control.md).
+Background and the Linux equivalent: [`docs/remote-pc-setup.md`](../../../docs/remote-pc-setup.md).

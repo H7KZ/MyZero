@@ -65,7 +65,8 @@ FONT_6X10, 21 chars × 5 rows. `NOW ` shown for departures ≤0 min. `>99m` for 
 
 ## Configuration
 
-All config is baked into the binary at compile time. Copy the example and fill in your values:
+Config is read from `.env` at **startup** (via [`appconfig`](../../crates/config/README.md); process env vars
+override the file). Copy the example, fill in your values, and restart — no rebuild needed:
 
 ```sh
 cp .env.example .env

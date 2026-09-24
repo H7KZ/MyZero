@@ -7,7 +7,7 @@ it back to sleep — as a CLI, or as a token-authenticated HTTP API you can hit 
 > flat, but only something already on the wire can put a layer-2 magic packet on it.
 
 The design reasoning — power states, Fast Startup, why sleep beats shutdown, how to reach the Pi from outside — is in
-[`docs/remote-pc-control.md`](../../docs/remote-pc-control.md).
+[`docs/remote-pc-setup.md`](../../docs/remote-pc-setup.md).
 
 ## Commands
 
@@ -107,6 +107,9 @@ provisioner. That step also generates `~/.ssh/id_pcctl` on the Pi and prints the
 
 ## `.env` reference
 
+Read at startup, not baked in — see [`crates/config`](../../crates/config/README.md) for the file-lookup order
+and precedence. No rebuild needed after an edit, just a restart (or `systemctl restart pcctl`).
+
 | Key                                        | Meaning                                                              |
 |--------------------------------------------|----------------------------------------------------------------------|
 | `PC_MAC`                                   | MAC of the PC's **wired** NIC. `getmac /v` on Windows.               |
@@ -125,8 +128,7 @@ provisioner. That step also generates `~/.ssh/id_pcctl` on the Pi and prints the
 | `API_TOKEN`                                | `openssl rand -hex 32`. Required for any non-loopback bind.          |
 | `WAKE_TIMEOUT_SECS`                        | How long `--wait` polls. S3 wakes in seconds; S5 can take a minute.  |
 
-`.env` is **gitignored** (it holds the real MAC and token); `.env.example` is the template — and the fallback, so a
-fresh clone still builds, with a `cargo:warning` telling you it did.
+`.env` is **gitignored** (it holds the real MAC and token); `.env.example` is the template.
 
 ## Notes
 
@@ -140,4 +142,4 @@ fresh clone still builds, with a `cargo:warning` telling you it did.
 - Without the `gpio` feature there's no hardware dependency at all, so `pcctl` builds and runs on your laptop — handy
   for testing before it ever reaches the Pi.
 - How to actually drive all this day to day — phone shortcuts, Moonlight, RDP, physical buttons — is in
-  [`docs/using-the-remote-pc.md`](../../docs/using-the-remote-pc.md).
+  [`docs/remote-pc-usage.md`](../../docs/remote-pc-usage.md).

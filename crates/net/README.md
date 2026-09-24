@@ -45,4 +45,4 @@ also proves the machine finished booting rather than merely powering a NIC.
 - Everything here is unit-tested (`cargo test -p net`).
 - The target PC needs Wake-on-LAN enabled (BIOS + NIC "magic packet"), and sender and target must share the LAN
   subnet — broadcasts don't route. The full checklist is in
-  [`docs/remote-pc-control.md`](../../docs/remote-pc-control.md).
+  [`docs/remote-pc-setup.md`](../../docs/remote-pc-setup.md).

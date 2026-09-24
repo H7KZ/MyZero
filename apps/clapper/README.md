@@ -32,7 +32,7 @@ claps within `CLAP_WINDOW_MS` fire the action.
 | `src/main.rs`     | Clap-counting loop → trigger                             |
 | `net` (crate)     | `wol::send` — the Wake-on-LAN magic packet (unit-tested) |
 | `src/feedback.rs` | Optional LED + OLED status (`devices` crate)             |
-| `src/config.rs`   | Compile-time config baked from `.env` (`build.rs`)       |
+| `src/config.rs`   | Runtime config loaded from `.env` via [`appconfig`](../../crates/config/README.md) |
 
 ## Hardware
 
@@ -65,6 +65,9 @@ Unit at
 `pizero.conf` and run the provisioner.
 
 ## `.env` reference
+
+Read at startup, not baked in — see [`crates/config`](../../crates/config/README.md) for the file-lookup order
+and precedence. No rebuild needed after an edit, just a restart.
 
 | Key                                                  | Meaning                                              |
 |------------------------------------------------------|------------------------------------------------------|
