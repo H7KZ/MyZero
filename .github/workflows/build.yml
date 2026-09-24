@@ -1,0 +1,75 @@
+name: Build
+
+on:
+  # check is cheap (no cross-compile), so also run it on PRs as a fast
+  # sanity gate; the actual binary build stays manual-only (workflow_dispatch).
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: App to build
+        type: choice
+        options: [all, clapper, departure-board, pcctl]
+        default: all
+      profile:
+        description: Cargo profile
+        type: choice
+        options: [release, dev]
+        default: release
+
+env:
+  TARGET: aarch64-unknown-linux-gnu
+
+jobs:
+  # Manual-only: fmt/clippy/test, run off-Pi with GPIO deps disabled where
+  # possible (see AGENTS.md — only pcctl/net/appconfig build without rppal).
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy -p pcctl -p net -p appconfig --no-default-features -- -D warnings
+      - run: cargo test -p net -p appconfig
+
+  build:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ env.TARGET }}
+      - uses: Swatinem/rust-cache@v2
+      # rppal/sh1106 need a real aarch64 sysroot (linker + libc), which a
+      # bare `--target` add doesn't provide on an x86_64 runner — `cross`
+      # supplies that via its Docker image.
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross --locked
+      - name: Build (all apps)
+        if: ${{ inputs.app == 'all' }}
+        run: cross build --target ${{ env.TARGET }} --profile ${{ inputs.profile == 'dev' && 'dev' || 'release' }}
+      - name: Build (${{ inputs.app }})
+        if: ${{ inputs.app != 'all' }}
+        run: cross build -p ${{ inputs.app }} --target ${{ env.TARGET }} --profile ${{ inputs.profile == 'dev' && 'dev' || 'release' }}
+      - name: Collect binaries
+        run: |
+          mkdir -p dist
+          outdir=target/${{ env.TARGET }}/${{ inputs.profile == 'dev' && 'debug' || 'release' }}
+          if [ "${{ inputs.app }}" = "all" ]; then
+            for b in clapper departure-board pcctl; do
+              [ -f "$outdir/$b" ] && cp "$outdir/$b" dist/
+            done
+          else
+            cp "$outdir/${{ inputs.app }}" dist/
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: myzero-${{ inputs.app }}-${{ steps.sha.outputs.short }}
+          path: dist/*
+          if-no-files-found: error

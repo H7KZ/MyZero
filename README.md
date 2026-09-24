@@ -21,6 +21,8 @@ Makefile              build / deploy / run helpers
 AGENTS.md             instructions for coding agents working in this repo
 ```
 
+New here? Start with [docs/getting-started.md](docs/getting-started.md) — zero to running, step by step.
+
 Each part has its own README:
 [devices](crates/devices/README.md) · [net](crates/net/README.md) · [config](crates/config/README.md) ·
 [departure-board](apps/departure-board/README.md) ·
@@ -62,12 +64,22 @@ limit.
 ## Build
 
 ```sh
-make build                          # cross-compile the whole workspace for the Pi
+make build                          # cross-compile just $(BIN) (default: departure-board)
+make build-all                      # cross-compile the whole workspace for the Pi
 make check                          # clippy + fmt
 
-make ship BIN=departure-board       # build + scp a chosen app to the Pi
-make run  BIN=clapper               # ssh + run it
+make ship BIN=departure-board       # build + scp a chosen app to the Pi, restart its systemd unit
+make run  BIN=clapper               # ssh + run it directly
+make logs BIN=pcctl                 # tail its systemd journal
+make status BIN=pcctl               # its systemd status
+
+make new-env BIN=clapper            # create apps/clapper/.env from .env.example
+make env BIN=clapper                # ship apps/clapper/.env to the Pi as ~/clapper.env
 ```
+
+A manual GitHub Actions workflow (`.github/workflows/build.yml`) cross-builds any app (or all three) and uploads
+the binaries as artifacts; trigger it from the Actions tab (`workflow_dispatch`). Its fmt/clippy/test `check` job
+also runs on pull requests.
 
 All three apps cross-compile cleanly with plain `cross` — they're `rppal` GPIO + std (departure-board also
 HTTP/JSON), no native audio/ML libraries. `pcctl` uses no GPIO at all, so it builds and runs on your laptop too.

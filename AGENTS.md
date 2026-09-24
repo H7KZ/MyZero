@@ -16,10 +16,18 @@ remote PC control) sharing one hardware layer, plus the OS provisioning that set
 ## Build / check / test
 
 ```sh
-make build       # cross-compile the whole workspace for the Pi (needs `cross` + Docker/Podman)
+make build       # cross-compile $(BIN) only (default: departure-board; needs `cross` + Docker/Podman)
+make build-all    # cross-compile the whole workspace for the Pi
 make check        # cargo clippy + fmt --check
 cargo test -p net -p appconfig # pure-std crates test anywhere
 ```
+
+`make ship BIN=<app>` builds and scps the binary, then restarts `<app>`'s systemd unit on the Pi (unit must
+already be installed). `make logs BIN=<app>` / `make status BIN=<app>` tail the journal / show systemd status.
+`make new-env BIN=<app>` copies that app's `.env.example` to a local (gitignored) `.env`; `make env BIN=<app>`
+ships it to the Pi as `~/<app>.env`. A manual-only GitHub Actions workflow (`.github/workflows/build.yml`,
+`workflow_dispatch`) cross-builds and uploads binaries as artifacts; its `check` job (fmt/clippy/test) also runs
+on pull requests.
 
 On a **Windows host**, `rppal` (hence `devices`, `departure-board`, `clapper`) won't build — only this works:
 
@@ -48,7 +56,9 @@ edit an app's key list in more than one place — it lives in that app's `.env.e
 
 ## Docs map
 
-Root `README.md` is the human entry point. `docs/remote-pc-setup.md` is one-time setup end to end;
+Root `README.md` is the human entry point. `docs/getting-started.md` is the zero-to-running linear walkthrough
+(flash, provision, build, configure, deploy, autostart, then optional app tracks). `docs/remote-pc-setup.md` is
+pcctl's one-time setup end to end;
 `docs/remote-pc-usage.md` is day-to-day use and troubleshooting. Each crate/app README documents only itself —
 link, don't copy.
 
